@@ -1,0 +1,69 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Question;
+use App\Jobs\ValidateQuestionWithChatGpt;
+use App\Jobs\ValidateQuestionWithGemini;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+
+class QuestionSubmissionController extends Controller
+{
+    /**
+     * Maneja la solicitud para enviar una pregunta a validación
+     * usando el motor de IA especificado.
+     */
+    public function __invoke(Request $request, Question $question): RedirectResponse
+    {
+        // 1. Autorización: ¿Tiene este usuario permiso para enviar ESTA pregunta?
+        Gate::authorize('submitForValidation', $question);
+
+        // 2. Validación de la Entrada: ¿Eligió un motor de IA válido?
+        $validated = $request->validate([
+            'ai_engine' => ['required', 'string', Rule::in(['chatgpt', 'gemini'])],
+        ]);
+
+        // 3. Validación de Estado: ¿Está la pregunta en un estado que permite el envío?
+        if (!in_array($question->status, ['borrador', 'necesita_correccion'])) {
+            return back()->with('error', 'Esta pregunta ya está en proceso de validación o ha sido aprobada.');
+        }
+
+        // 4. Actualización y Despacho del Job en una transacción segura.
+        try {
+            $question->update(['status' => 'en_validacion_ai']);
+
+            $engineName = '';
+            switch ($validated['ai_engine']) {
+                case 'chatgpt':
+                    ValidateQuestionWithChatGpt::dispatch($question);
+                    $engineName = 'ChatGPT';
+                    break;
+                case 'gemini':
+                    ValidateQuestionWithGemini::dispatch($question);
+                    $engineName = 'Gemini';
+                    break;
+            }
+        } catch (\Exception $e) {
+            // Si algo falla, registramos el error y revertimos el estado.
+            Log::error('Fallo al despachar el job de validación: ' . $e->getMessage(), [
+                'user_id' => optional(Auth::user())->id,
+                'user_id' => optional(auth())->id,
+                'ai_engine' => $request->input('ai_engine'),
+            ]);
+            
+            // Revertir el estado a borrador si el despacho a la cola falla.
+            $question->update(['status' => 'borrador']);
+
+            return back()->with('error', 'Ocurrió un error al procesar tu solicitud. Por favor, intenta de nuevo.');
+        }
+
+        // 5. Redirección con Feedback de éxito
+        return redirect()->route('questions.index')
+            ->with('status', "¡Éxito! La pregunta ha sido enviada a validación con {$engineName}.");
+    }
+}
