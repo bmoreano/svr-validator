@@ -80,7 +80,7 @@ class BatchValidationController extends Controller
             // Toda la lógica pesada se delega a este job, que se ejecutará en la cola.
             ProcessBatchFile::dispatch(
                 $path,
-                auth()->id(),
+                optional(auth())->id,
                 $validated['ai_engine']
             );
 

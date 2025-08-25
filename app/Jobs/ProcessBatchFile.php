@@ -121,12 +121,16 @@ class ProcessBatchFile implements ShouldQueue
                 });
 
                 // Si la pregunta se creó correctamente, se despacha el job de validación.
-                if ($question) {
+                               if ($question) {
                     $question->update(['status' => 'en_validacion_ai']);
                     
+                    // =======================================================
+                    // ==             LÓGICA DE SELECCIÓN DE JOB            ==
+                    // =======================================================
                     if ($this->aiEngine === 'chatgpt') {
                         ValidateQuestionWithChatGpt::dispatch($question)->onQueue('validations');
                     } else {
+                        // Si no es chatgpt, por defecto es gemini (ya validado en el controlador)
                         ValidateQuestionWithGemini::dispatch($question)->onQueue('validations');
                     }
                 }
@@ -139,7 +143,14 @@ class ProcessBatchFile implements ShouldQueue
             // Notificar al usuario que el proceso ha terminado.
             if ($user) {
                 // Aquí necesitarías crear la notificación 'BatchValidationComplete'
-                // $user->notify(new BatchValidationComplete());
+                $user->notify(new BatchValidationComplete());
+            }
+            // =============================================
+            // ==      ENVÍO DE LA NOTIFICACIÓN FINAL       ==
+            // =============================================
+            if ($user) {
+                // Notificamos al usuario que el proceso de subida y despacho ha terminado.
+                $user->notify(new BatchValidationComplete());
             }
 
             Log::info("Procesamiento por lotes del archivo {$this->filePath} para el usuario #{$this->userId} ha finalizado.");

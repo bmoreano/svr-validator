@@ -64,8 +64,12 @@ class Option extends Model
      */
     protected $casts = [
         'is_correct' => 'boolean',
+        'option_text' => 'encrypted',
+        'argumentation' => 'encrypted',
     ];
 
+
+    
     // --- RELACIÓN ELOQUENT ---
 
     /**

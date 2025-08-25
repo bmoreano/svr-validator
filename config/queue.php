@@ -65,15 +65,14 @@ return [
 
         'redis' => [
             'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
-            'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'connection' => 'default',
+            'queue' => env('REDIS_QUEUE', 'high,default,low,notifications,batch-processing'),// Esta es la lista de colas por defecto si `queue:work` no especifica ninguna.El orden es importante: primero 'high', luego 'default', etc.
+            'retry_after' => 90,
             'block_for' => null,
             'after_commit' => false,
         ],
 
     ],
-
     /*
     |--------------------------------------------------------------------------
     | Job Batching

@@ -50,26 +50,28 @@ class Question extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'code', 
         'author_id',
+        'career_id',
         'stem',
         'status',
         'bibliography',
-        'corregido_administrador', // <-- Añadido
-        'comentario_administrador', // <-- Añadido
+        'corregido_administrador', 
+        'comentario_administrador', 
+        'grado_dificultad',
+        'poder_discriminacion',
     ];
 
     /**
      * Los atributos que deben ser casteados a tipos nativos.
-     *
-     * @var array<string, string>
+     * Añadimos los campos a encriptar.
      */
     protected $casts = [
-        // Le decimos a Eloquent que trate este campo como un array/objeto.
-        'corregido_administrador' => 'array', // <-- Añadido
+        'stem' => 'encrypted',
+        'bibliography' => 'encrypted',
+        'corregido_administrador' => 'array', 
     ];
 
-
-    // --- RELACIONES ELOQUENT ---
 
     /**
      * Define la relación inversa: Una pregunta pertenece a un único autor (User).
@@ -111,11 +113,9 @@ class Question extends Model
 
 /*  
     Aquí puedes añadir métodos adicionales para lógica de negocio específica,
-    como obtener la respuesta correcta, verificar si la pregunta está completa, etc.
-    Por ejemplo:
 */
-    public function correctOption(): ?Option
-    {
-        return $this->options()->where('is_correct', true)->first();
-    } 
+    public function correctOption(): ?Option{ return $this->options()->where('is_correct', true)->first();} 
+    public function assignedValidator(){ return $this->belongsTo(User::class, 'assigned_validator_id'); }
+    public function career(): BelongsTo { return $this->belongsTo(Career::class); }
+    public function revisions() { return $this->hasMany(QuestionRevision::class)->latest(); }
 }

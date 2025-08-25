@@ -11,6 +11,7 @@ use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Jetstream\HasTeams;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Representa un usuario en la aplicación. Puede ser un Autor,
@@ -92,7 +93,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role', // ¡Importante! Añadimos nuestro campo de rol aquí.
+        'role', 
+        'area_conocimiento',
+        'career_id',
     ];
 
     /**
@@ -156,4 +159,9 @@ class User extends Authenticatable
         // El segundo argumento 'validator_id' es la llave foránea en la tabla 'validations'.
         return $this->hasMany(Validation::class, 'validator_id');
     }
+
+    
+    
+    
+    public function career(): BelongsTo { return $this->belongsTo(Career::class); }
 }

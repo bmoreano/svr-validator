@@ -1,59 +1,105 @@
 <?php
 
-// app/Services/PromptBuilderService.php
 namespace App\Services;
 
 use App\Models\Criterion;
+use App\Models\Prompt;
 use App\Models\Question;
+use Illuminate\Support\Collection;
 
-
+/**
+ * Class PromptBuilderService
+ *
+ * Responsabilidad: Construir los prompts que se enviarán a los modelos de IA.
+ * Esta clase ahora soporta la división de criterios en lotes.
+ */
 class PromptBuilderService
 {
-// Define the prompt template as a class constant
-private const PROMPT = <<<EOT
-Eres un validador académico experto y riguroso. Tu tarea es analizar una pregunta y evaluarla contra una lista de criterios de calidad.
-
-**Instrucciones:**
-1.  Analiza la pregunta en el bloque "PREGUNTA".
-2.  Evalúa CADA UNO de los criterios en el bloque "CRITERIOS".
-3.  Tu respuesta debe ser "si", "no", o "adecuar".
-4.  Para "no" o "adecuar", proporciona un comentario claro y conciso explicando la razón.
-5.  Tu respuesta final DEBE ser únicamente un objeto JSON válido, un array de objetos.
-
-**CRITERIOS A EVALUAR:**
-{{CRITERIOS}}
-
-**PREGUNTA A EVALUAR:**
-{{PREGUNTA}}
-EOT;
-
     /**
-     * Build the prompt by replacing placeholders with actual criteria and question data.
+     * Construye un prompt para Gemini usando un lote específico de criterios.
      *
-     * @param string $criteriaText
-     * @param string $questionData
+     * @param Question $pregunta
+     * @param int|null $prompt_id
+     * @param Collection $criteriaBatch El lote de criterios a incluir en el prompt.
      * @return string
      */
-    public function buildPrompt(string $criteriaText, string $questionData): string
+    public function buildForGemini(Question $pregunta, ?int $prompt_id, Collection $criteriaBatch): string
     {
-        return str_replace(['{{CRITERIOS}}', '{{PREGUNTA}}'], [$criteriaText, $questionData], self::PROMPT);
+        $promptContent = $this->getPromptContent($prompt_id, 'gemini');
+        $formatoEstricto = "[{\"criterion_id\": 1, \"response\": \"si\", \"comment\": \"...\"}]";
+        $promptContent = str_replace('{{FORMATO_ESTRICTO}}', $formatoEstricto, $promptContent);
+
+        // La llamada a replaceVariables ahora incluye el tercer argumento.
+        return $this->replaceVariables($promptContent, $pregunta, $criteriaBatch);
     }
-    public function buildForChatGpt(Question $question): string
+
+    /**
+     * Construye un prompt para ChatGPT usando un lote específico de criterios.
+     *
+     * @param Question $pregunta
+     * @param int|null $prompt_id
+     * @param Collection $criteriaBatch El lote de criterios a incluir en el prompt.
+     * @return array
+     */
+    public function buildForChatGpt(Question $pregunta, ?int $prompt_id, Collection $criteriaBatch): array
     {
-        $criteriaText = Criterion::where('is_active', true)->orderBy('sort_order')->get()->map(function ($criterion) {
-            return "- ID: {$criterion->id}, Criterio: {$criterion->text}";
-        })->implode("\n");
+        $promptContent = $this->getPromptContent($prompt_id, 'chatgpt');
+        
+        // ========================================================================
+        // La llamada a replaceVariables ahora incluye el tercer argumento '$criteriaBatch',
+        // cumpliendo con la firma del método y solucionando el error.
+        // ========================================================================
+        $finalPromptText = $this->replaceVariables($promptContent, $pregunta, $criteriaBatch);
+        
+        return [
+            ['role' => 'system', 'content' => 'Eres un validador académico experto y riguroso. Tu única función es analizar una pregunta y devolver tus hallazgos en formato JSON.'],
+            ['role' => 'user', 'content' => $finalPromptText],
+        ];
+    }
 
-        $questionData = json_encode([
-            'enunciado' => $question->stem,
-            'opciones' => $question->options->map(fn ($opt) => [
-                'texto' => $opt->option_text,
-                'es_correcta' => $opt->is_correct,
-                'argumentacion' => $opt->argumentation
-            ]),
-            'bibliografia' => $question->bibliography
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    /**
+     * Obtiene la plantilla de prompt, ya sea de la BD o una por defecto.
+     */
+    private function getPromptContent(?int $prompt_id, string $engine): string
+    {
+        if ($prompt_id) {
+            $promptModel = Prompt::find($prompt_id);
+            if ($promptModel) return $promptModel->content;
+        }
+        
+        return "ROL: Eres un evaluador académico experto.\nTAREA: Evalúa la pregunta en {{PREGUNTA_JSON}} contra los criterios en {{CRITERIOS}}.\nREGLAS DE SALIDA (MUY IMPORTANTE):\nTu respuesta DEBE ser únicamente un array JSON válido con las claves \"criterion_id\", \"response\", y \"comment\".\nEJEMPLO DE FORMATO:\n{{FORMATO_ESTRICTO}}";
+    }
+    
+    /**
+     * Reemplaza las variables dinámicas en una plantilla de prompt.
+     * Esta es la definición del método que espera TRES argumentos.
+     */
+    private function replaceVariables(string $content, Question $pregunta, Collection $criteriaBatch): string
+    {
+        $variables = [
+            '{{PREGUNTA_JSON}}' => $this->formatearPreguntaComoJson($pregunta),
+            '{{CRITERIOS}}' => $this->formatearCriterios($criteriaBatch),
+        ];
+        return str_replace(array_keys($variables), array_values($variables), $content);
+    }
 
-        return $questionData . "\n\n" . $criteriaText;
-    }       
+    /**
+     * Formatea una colección de criterios a texto.
+     */
+    private function formatearCriterios(Collection $criteria): string
+    {
+        return $criteria->map(fn($criterio) => "- ID: {$criterio->id}, Criterio: {$criterio->text}")->implode("\n");
+    }
+    
+    /**
+     * Formatea una pregunta a JSON.
+     */
+    private function formatearPreguntaComoJson(Question $pregunta): string
+    {
+        return json_encode([
+            'enunciado' => $pregunta->stem,
+            'opciones' => $pregunta->options->map(fn($opcion) => ['texto' => $opcion->option_text, 'es_correcta' => $opcion->is_correct]),
+            'bibliografia' => $pregunta->bibliography,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    }
 }

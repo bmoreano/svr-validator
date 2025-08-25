@@ -1,4 +1,5 @@
 <?php
+use Illuminate\Support\Facades\Facade;
 
 return [
 
@@ -122,5 +123,16 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Class Aliases
+    |--------------------------------------------------------------------------
+    | Aquí añadimos el alias de Gemini
+    */
+    'aliases' => Facade::defaultAliases()->merge([
+        'Gemini' => \Gemini\Laravel\Facades\Gemini::class,
+    ])->toArray(),
+
 
 ];

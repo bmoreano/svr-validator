@@ -20,7 +20,7 @@ class UserSeeder extends Seeder
                 'email' => 'ai@example.com',
                 'email_verified_at' => now(),
                 'current_team_id' => 1, // Asignar al equipo por defecto
-                'two_factor_confirmed_at' => now(), // Confirmar autenticación de dos factores
+                //'two_factor_confirmed_at' => now(), // Confirmar autenticación de dos factores
                 'role' => 'validador',
 
             ]
@@ -34,7 +34,7 @@ class UserSeeder extends Seeder
                 'email' => 'admin@example.com',
                 'email_verified_at' => now(),
                 'current_team_id' => 1, // Asignar al equipo por defecto
-                'two_factor_confirmed_at' => now(), // Confirmar autenticación de dos factores
+                //'two_factor_confirmed_at' => now(), // Confirmar autenticación de dos factores
                 'role' => 'administrador',
             ]
         );
@@ -45,8 +45,30 @@ class UserSeeder extends Seeder
                 'email' => 'creator@example.com',
                 'email_verified_at' => now(),
                 'current_team_id' => 1, // Asignar al equipo por defecto
-                'two_factor_confirmed_at' => now(), // Confirmar autenticación de dos factores
+                //'two_factor_confirmed_at' => now(), // Confirmar autenticación de dos factores
                 'role' => 'autor',
+            ]
+        );
+        User::firstOrCreate()->create(
+            [
+                'name' => 'Byron Alejandro',
+                'password' => Hash::make('password'),
+                'email' => 'byron.moreano@caces.gob.ec',
+                'email_verified_at' => now(),
+                'current_team_id' => 1, // Asignar al equipo por defecto
+                //'two_factor_confirmed_at' => now(), // Confirmar autenticación de dos factores
+                'role' => 'autor',
+            ]
+        );
+        User::firstOrCreate()->create(
+            [
+                'name' => 'Byron',
+                'password' => Hash::make('password'),
+                'email' => 'byron.moreano@gmail.com',
+                'email_verified_at' => now(),
+                'current_team_id' => 1, // Asignar al equipo por defecto
+                //'two_factor_confirmed_at' => now(), // Confirmar autenticación de dos factores
+                'role' => 'validador',
             ]
         );
         

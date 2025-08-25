@@ -4,38 +4,23 @@ namespace App\Policies;
 
 use App\Models\Question;
 use App\Models\User;
-use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Auth\Access\Response;
 
 class QuestionPolicy
 {
-    use HandlesAuthorization;
-
     /**
-     * El método before() ha sido eliminado.
-     * Ya no queremos que el administrador tenga permisos automáticos sobre las preguntas.
-     * Cada regla se evaluará de forma explícita.
-     */
-
-    /**
-     * Determina si el usuario puede ver la lista de sus propias preguntas.
-     * Solo los autores pueden tener una lista de "mis preguntas".
+     * Determina si el usuario puede ver la lista de preguntas.
      */
     public function viewAny(User $user): bool
     {
-        return $user->role === 'autor';
+        return in_array($user->role, ['autor', 'administrador']);
     }
 
     /**
      * Determina si el usuario puede ver una pregunta específica.
-     * Permitiremos que cualquiera (autor, validador, admin) vea los detalles
-     * de una pregunta, ya que es una acción de solo lectura.
      */
     public function view(User $user, Question $question): bool
     {
-        // En este caso, permitimos que todos los roles autenticados vean la pregunta.
-        // Si quisiéramos ser más estrictos (ej. solo el autor y validadores asignados),
-        // la lógica iría aquí. Por ahora, es una acción de lectura simple.
         return true;
     }
 
@@ -45,53 +30,85 @@ class QuestionPolicy
      */
     public function create(User $user): bool
     {
+        // Si el rol del usuario no es 'autor', no puede crear.
         return $user->role === 'autor';
     }
 
     /**
      * Determina si el usuario puede actualizar (editar) una pregunta.
-     * REGLA CLAVE: Solo el 'autor' que es propietario de la pregunta.
+     * Solo se pueden editar preguntas en estado 'borrador'.
      */
-    public function update(User $user, Question $question): Response
+    public function update(User $user, Question $question): bool
     {
-        // Regla 1: ¿Es el usuario un autor?
-        if ($user->role !== 'autor') {
-            return Response::deny('Solo los autores pueden editar preguntas.');
+        $isEditableStatus = in_array($question->status, [
+            'borrador', 
+            'necesita_correccion', 
+            'fallo_comparativo'
+        ]);
+        
+        if ($user->role === 'administrador') {
+            return $isEditableStatus;
         }
-
-        // Regla 2: ¿Es el autor el propietario de la pregunta?
-        if ($user->id !== $question->author_id) {
-            return Response::deny('No eres el propietario de esta pregunta.');
-        }
-
-        // Regla 3: ¿Está la pregunta en un estado editable?
-        if (!in_array($question->status, ['borrador', 'necesita_correccion'])) {
-            return Response::deny('No se puede editar una pregunta que ya ha sido enviada o aprobada.');
-        }
-
-        return Response::allow();
+        
+        return $user->id === $question->author_id && $isEditableStatus;
     }
 
     /**
      * Determina si el usuario puede eliminar una pregunta.
-     * REGLA CLAVE: Solo el 'autor' propietario y solo si es un borrador.
      */
     public function delete(User $user, Question $question): bool
     {
-        return $user->role === 'autor'
-            && $user->id === $question->author_id
-            && $question->status === 'borrador';
+        // Aplicamos la misma lógica para la eliminación.
+        $isDeletableStatus = in_array($question->status, [
+            'borrador', 
+            'necesita_correccion', 
+            'fallo_comparativo'
+        ]);
+        
+        if ($user->role === 'administrador') {
+            return $isDeletableStatus;
+        }
+
+        return $user->id === $question->author_id && $isDeletableStatus;
     }
     
     /**
-     * Determina si el usuario puede enviar la pregunta a validación.
-     * REGLA CLAVE: Solo el 'autor' propietario.
+     * Determina si el usuario puede eliminar una pregunta.
+     * Solo se pueden eliminar preguntas en estado 'borrador'.
      */
+    public function delete1(User $user, Question $question): bool
+    {
+        if ($question->status !== 'borrador') {
+            return false;
+        }
+        
+        if ($user->role === 'administrador') {
+            return true;
+        }
+
+        if ($user->role === 'autor') {
+            return $user->id === $question->author_id;
+        }
+        
+        return false;
+    }
+    
+
+        // ==========================================================
+        // Determina si el usuario puede enviar la pregunta a validación.
+        // Permitimos que tanto el autor propietario como cualquier administrador
+        // puedan enviar una pregunta a validación si está en el estado correcto.
+        // ==========================================================    
     public function submitForValidation(User $user, Question $question): bool
     {
-        return $user->role === 'autor' && $user->id === $question->author_id;
+
+        $isSubmittableStatus = in_array($question->status, ['borrador', 'necesita_correccion', 'fallo_comparativo']);
+        
+        if ($user->role === 'administrador') {
+            return $isSubmittableStatus;
+        }
+
+        return $user->id === $question->author_id && $isSubmittableStatus;
     }
 
-    // Los métodos restore() y forceDelete() se pueden dejar como estaban o
-    // ajustarlos con la misma lógica si se usan soft deletes.
 }

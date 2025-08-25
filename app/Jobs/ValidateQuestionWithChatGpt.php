@@ -2,100 +2,106 @@
 
 namespace App\Jobs;
 
+use App\Models\Prompt;
 use App\Models\Question;
 use App\Models\User;
-use App\Notifications\QuestionReadyForReview;
+use App\Notifications\AiValidationCompleted;
+use App\Notifications\AiValidationFailed;
 use App\Services\PromptBuilderService;
 use App\Services\ValidationParserService;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
-// --- IMPORTAMOS LA CLASE DEL CLIENTE DIRECTAMENTE ---
 use OpenAI\Client as OpenAIClient;
+use Illuminate\Bus\Queueable;
+use Illuminate\Bus\Batchable;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\ReviewRequestForValidators;
 
 class ValidateQuestionWithChatGpt implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * El número de veces que el job puede ser reintentado en caso de fallo.
-     * @var int
-     */
-    public $tries = 3;
+    public int $tries = 10;
+    public int $timeout = 600; // 10 minutos
+    public ?int $questionId;
+    public ?int $prompt_id;
 
-    /**
-     * El número de segundos que el job puede correr antes de ser marcado como fallido (timeout).
-     * @var int
-     */
-    public $timeout = 300; // 5 minutos
-
-    /**
-     * Crea una nueva instancia del job.
-     *
-     * @param \App\Models\Question $question
-     */
-    public function __construct(public Question $question)
+    // El constructor ahora espera un ID de pregunta, no el modelo completo.
+    public function __construct(int $questionId, ?int $prompt_id = null)
     {
-        // Se asegura de que el job solo se procese en la cola 'validations'
-        $this->onQueue('validations');
+        $this->questionId = $questionId;
+        $this->prompt_id = $prompt_id;
     }
 
     /**
-     * Ejecuta el job de validación con ChatGPT.
-     *
-     * @param \OpenAI\Client $openAIClient El cliente de OpenAI, inyectado por el contenedor de servicios de Laravel.
-     * @param \App\Services\PromptBuilderService $promptBuilder
-     * @param \App\Services\ValidationParserService $parser
-     * @return void
-     * @throws \Throwable
+     * Ejecuta el job.
      */
-    public function handle(OpenAIClient $openAIClient, PromptBuilderService $promptBuilder, ValidationParserService $parser): void
-    {
-        try {
-            // La variable $openAIClient ya está instanciada y lista para usarse gracias a la inyección de dependencias.
-            
-            // Construimos el prompt específico para el modelo de chat.
-            $messages = $promptBuilder->buildForChatGpt($this->question);
+    public function handle(
+        OpenAIClient $openAIClient,
+        PromptBuilderService $promptBuilder,
+        ValidationParserService $parser
+    ): void {
+        $question = Question::findOrFail($this->questionId);
+        Log::warning("Job de ChatGPT ValidateQuestionWithChatGpt->handle con #{$question->id} porque su estado es '{$question->status}'.");
+                $allowedStatuses = ['en_validacion_ai', 'en_validacion_comparativa'];
+        if (!in_array($question->status, $allowedStatuses)) {
+        //if ($question->status !== 'en_validacion_ai') {
+            Log::warning("Job de ChatGPT cancelado para la pregunta #{$question->id} porque su estado es '{$question->status}'.");
+            return;
+        }
 
-            // Realizamos la llamada a la API de Chat Completions.
+        try {
+            Log::warning("Job de ChatGPT ValidateQuestionWithChatGpt->handle->try con #{$question->id} porque su estado es '{$question->status}'.");
+            $messages = $promptBuilder->buildForChatGpt($question, $this->prompt_id);
             $response = $openAIClient->chat()->create([
-                'model' => 'gpt-4-turbo-preview',
-                'response_format' => ['type' => 'json_object'], // Solicitamos una respuesta en formato JSON garantizado.
+                'model' => 'gpt-4o',
+                'response_format' => ['type' => 'json_object'],
                 'messages' => $messages,
             ]);
 
+            Log::warning("Job de ChatGPT ValidateQuestionWithChatGpt->handle con #{$question->id} porque su estado es '{$question->status}'.");
             $jsonResponse = $response->choices[0]->message->content;
-
-            // Usamos nuestro servicio para parsear y guardar la validación en la base de datos.
-            if ($parser->saveAiValidation($this->question, $jsonResponse)) {
-                $this->question->update(['status' => 'revisado_por_ai']);
-                $this->notifyValidators();
+            $engineName = 'ChatGPT';
+            if ($parser->saveAiValidation($question, $jsonResponse,$engineName)) {
+                $question->update(['status' => 'revisado_por_ai']);
+                $question->author->notify(new AiValidationCompleted($question, $engineName));
+                
+                $validators = User::where('role', 'validador')->get();
+                if ($validators->isNotEmpty()) {
+                    Notification::send($validators, new ReviewRequestForValidators($question, $engineName));
+                }
+                Log::info("Pregunta #{$question->id} validada con éxito por ChatGPT.");
             } else {
-                throw new \Exception("El servicio de parseo falló al procesar la respuesta de la IA para la pregunta #{$this->question->id}.");
+                $this->fail(new \Exception("El ValidationParserService falló al procesar la respuesta de ChatGPT para la pregunta #{$question->id}."));
             }
-
         } catch (\Exception $e) {
-            // Si ocurre cualquier error, lo registramos, actualizamos el estado
-            // de la pregunta y marcamos el job como fallido.
-            $this->question->update(['status' => 'error_validacion_ai']);
-            Log::error("Error en el Job ValidateQuestionWithChatGpt para la pregunta #{$this->question->id}: " . $e->getMessage());
+            Log::error("Excepción en Job ChatGPT para la pregunta #{$question->id}", [
+                'exception' => $e
+            ]);
             $this->fail($e);
         }
     }
 
     /**
-     * Busca a los usuarios con el rol de validador y les envía la notificación por correo.
+     * Maneja un fallo en el job después de todos los reintentos.
      */
-    private function notifyValidators(): void
+    public function failed(\Throwable $exception): void
     {
-        $validators = User::where('role', 'validador')->get();
-        
-        if ($validators->isNotEmpty()) {
-            Notification::send($validators, new QuestionReadyForReview($this->question));
-        }
+
+        $question = Question::findOrFail($this->questionId);
+        $question->update(['status' => 'borrador']);
+
+        Log::critical("El Job de ChatGPT para la pregunta #{$question->id} ha fallado permanentemente.", [
+            'exception_message' => $exception->getMessage()
+        ]);
+
+        $question->author->notify(new AiValidationFailed(
+            $question,
+            'ChatGPT',
+            $exception->getMessage()
+        ));
     }
 }

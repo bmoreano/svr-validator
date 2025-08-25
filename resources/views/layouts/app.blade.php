@@ -18,7 +18,8 @@
 
         <div class="min-h-screen bg-gray-100 flex flex-col">
             @auth
-                <nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
+                @livewire('navigation-menu');
+                {{--<nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
                     <!-- Contenido de la Navegación Primaria -->
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div class="flex justify-between h-16">
@@ -30,14 +31,15 @@
                                 </div>
                                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                                     <x-nav-link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">
-                                        {{ __('Dashboard') }}
+                                        {{ __('Dashboard***app//-') }}
                                     </x-nav-link>
                                     @if(in_array(Auth::user()->role, ['autor', 'administrador']))
-                                        <x-nav-link href="{{ route('questions.index') }}" :active="request()->routeIs('questions.*') && !request()->routeIs('questions.batch.create')">
-                                            {{ __('Mis Preguntas') }}
+                                        <x-nav-link href="{{ route('questions.index') }}" :active="request()->routeIs('questions.*') && 
+                                        !request()->routeIs('questions.batch.create')">
+                                            {{ __('Mis Preguntas***app//-') }}
                                         </x-nav-link>
                                         <x-nav-link href="{{ route('questions.batch.create') }}" :active="request()->routeIs('questions.batch.create')">
-                                            {{ __('Validación Masiva') }}
+                                            {{ __('Validación Masiva***app//-') }}
                                         </x-nav-link>
                                     @endif
                                 </div>
@@ -78,9 +80,9 @@
 
                             @if(in_array(Auth::user()->role, ['autor', 'administrador']))
                                 <x-responsive-nav-link href="{{ route('questions.index') }}" :active="request()->routeIs('questions.*') && !request()->routeIs('questions.batch.create')">{{ __('Mis Preguntas') }}</x-responsive-nav-link>
-                                <x-responsive-nav-link href="{{ route('questions.batch.create') }}" :active="request()->routeIs('questions.batch.create')">{{ __('Validación Masiva') }}</x-responsive-nav-link>
+                                <x-responsive-nav-link href="{{ route('questions.batch.create') }}" :active="request()->routeIs('questions.batch.create')">{{ __('Validación Masiva***app//--') }}</x-responsive-nav-link>
                             @endif
-                            {{--@can('viewAny', App\Models\Question::class)<x-responsive-nav-link href="{{ route('questions.index') }}" :active="request()->routeIs('questions.*')">{{ __('Mis Preguntas') }}</x-responsive-nav-link>@endcan--}}
+                            {{ --@can('viewAny', App\Models\Question::class)<x-responsive-nav-link href="{{ route('questions.index') }}" :active="request()->routeIs('questions.*')">{{ __('Mis Preguntas') }}</x-responsive-nav-link>@endcan-- }}
                         </div>
                         <div class="pt-4 pb-1 border-t border-gray-200">
                             <div class="flex items-center px-4">
@@ -95,7 +97,7 @@
                             </div>
                         </div>
                     </div>
-                </nav>
+                </nav>--}}
             @endauth
 
             <!-- Contenido Principal -->
@@ -117,7 +119,7 @@
                 </div>
             </footer>
         </div>
-
+        @stack('scripts') 
         @stack('modals')
         @livewireScripts
     </body>
