@@ -17,8 +17,10 @@ class GeminiValidator implements AiValidatorInterface
 
     public function validate(Question $question, ?int $promptId, Collection $criteriaChunk): string
     {
+        logger()->info("GeminiValidator->validate.");
+        logger()->info("");
         $prompt = $this->promptBuilder->buildForGemini($question, $promptId, $criteriaChunk);
-        $model = $this->client->generativeModel('gemini-1.5-flash');
+        $model = $this->client->generativeModel('gemini-2.5-Pro');
         $result = $model->generateContent($prompt);
 
         return $result->text();

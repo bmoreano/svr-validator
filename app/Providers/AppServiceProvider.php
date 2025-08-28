@@ -32,8 +32,8 @@ class AppServiceProvider extends ServiceProvider
         
         // Le decimos a Laravel cómo construir el cliente de OpenAI.
         // Usamos un 'singleton' para que se cree una sola instancia por solicitud.
-        logger()->info("construir el cliente de OpenAI");
-        logger()->info("");
+        //logger()->info("construir el cliente de OpenAI");
+        logger()->info("AppServiceProvider");
         $this->app->singleton(OpenAIClient::class, function (Application $app) {
             $apiKey = $app['config']->get('services.openai.api_key');
             if (empty($apiKey)) {

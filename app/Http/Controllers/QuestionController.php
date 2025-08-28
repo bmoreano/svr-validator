@@ -40,7 +40,7 @@ class QuestionController extends Controller
         
         $questions = $query->with($relationsToLoad)->latest()->paginate(15);
 
-        return view('questions.index', [
+        return view('admin.questions.index', [
             'questions' => $questions,
             'prompts' => $activePrompts,
         ]);
@@ -53,7 +53,7 @@ class QuestionController extends Controller
     {
         $this->authorize('create', Question::class);
         $careers = Career::where('is_active', true)->orderBy('name')->get();
-        return view('questions.create', compact('careers'));
+        return view('admin.questions.create', compact('careers'));
     }
 
     /**
@@ -112,7 +112,7 @@ class QuestionController extends Controller
     {
         $this->authorize('view', $question);
         $question->load('options', 'author', 'career', 'revisions');
-        return view('questions.show', compact('question'));
+        return view('admin.questions.show', compact('question'));
     }
 
     /**
@@ -123,7 +123,7 @@ class QuestionController extends Controller
         $this->authorize('update', $question);
         $question->load('options');
         $careers = Career::where('is_active', true)->orderBy('name')->get();
-        return view('questions.edit', compact('question', 'careers'));
+        return view('admin.questions.edit', compact('question', 'careers'));
     }
 
     /**
@@ -155,7 +155,6 @@ class QuestionController extends Controller
                 'stem' => $validated['stem'],
                 'bibliography' => $validated['bibliography'],
                 'career_id' => $validated['career_id'],
-                'tema' => $validated['tema'],
                 'grado_dificultad' => $validated['grado_dificultad'],
                 'poder_discriminacion' => $validated['poder_discriminacion'],
             ]);
