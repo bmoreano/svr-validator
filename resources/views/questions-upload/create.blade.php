@@ -52,10 +52,11 @@
 
                     <div class="flex items-center justify-between mt-8 border-t pt-5">
                         <a href="{{ route('dashboard') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-600 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Cancelar</a>
-                        <button type="button" @click="validateAndSubmit()" :disabled="!file" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button type="button" @click="validateAndSubmit()" :disabled="!file" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
                             Validar e Iniciar Carga
                         </button>
-                    </div>
+                    </div>   
                 </form>
             </div>
         </div>
@@ -150,7 +151,7 @@
     </div>
     
    
-    @push('scripts')
+
     <script>
         function csvUploader() {
             return {
@@ -183,30 +184,33 @@
                         alert('Por favor, selecciona un archivo CSV.'); 
                         return; 
                     }
-
+                    
                     this.uploadModalOpen = true; 
                     this.progressHtml = '<p class="text-gray-700">Iniciando validación del archivo...</p>';
                     this.errors = [];
-
+                    this.progressHtml += '<p class="text-gray-700">Iniciando vector de errores ...</p>';
                     const reader = new FileReader();
+                    this.progressHtml += '<p class="text-blue-700">cargado archivo...</p>';
                     reader.onload = (e) => {
                         const text = e.target.result;
                         const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== ''); 
-                        
+                        this.progressHtml += '<p class="text-blue-700">leyendo archivo cargado ...</p>';
+                    this.progressHtml += '<p class="text-blue-700">cargado archivo ...</p>';    
                         if (lines.length === 0) {
-                            this.progressHtml = `<p class="text-red-600 font-bold">Error: El archivo está vacío.</p>`;
+                            this.progressHtml += `<p class="text-red-600 font-bold">Error: El archivo está vacío ...</p>`;
                             this.errors.push(['General', 'Archivo Vacío', 'No se encontraron datos en el archivo.']);
                             this.renderErrors(); 
                             return;
                         }
 
+                    this.progressHtml += '<p class="text-blue-700">archivo con datos ...</p>';
                         const header = lines[0] ? lines[0].trim() : '';
-                        const expectedHeader = "stem,bibliography,grado_dificultad,poder_discriminacion,opcion_1,argumentacion_1,opcion_2,argumentacion_2,opcion_3,argumentacion_3,opcion_4,argumentacion_4,respuesta_correcta";
+                        const expectedHeader = "stem;bibliography;grado_dificultad;poder_discriminacion;opcion_1;argumentacion_1;opcion_2;argumentacion_2;opcion_3;argumentacion_3;opcion_4;argumentacion_4;respuesta_correcta;career_id";
                         if (header !== expectedHeader) {
-                            this.progressHtml = `<p class="text-red-600 font-bold">Error: La cabecera del archivo es incorrecta.</p>`;
+                            this.progressHtml += `<p class="text-red-600 font-bold">Error: La cabecera del archivo es incorrecta.</p>`;
                             this.errors.push(['Línea 1', 'Cabecera Inválida', `Esperada: "${expectedHeader}" / Encontrada: "${header}"`]);
                         } else {
-                            this.progressHtml = '<p class="text-green-600 font-semibold">✔️ Cabecera correcta.</p>';
+                            this.progressHtml += '<p class="text-green-600 font-semibold">✔️ Cabecera correcta.</p>';
                         }
 
                         if (this.errors.length === 0) { 
@@ -214,25 +218,34 @@
                                 const line = lines[i];
                                 const fields = this.parseCsvLine(line);
                                 
-                                if (fields.length !== 13) {
+                                if (fields.length !== 14) {
                                     const truncatedLine = line.length > 100 ? line.substring(0, 100) + '...' : line;
                                     this.errors.push([`Línea ${i + 1}`, `Número de campos incorrecto (esperaba 13, encontró ${fields.length})`, truncatedLine]);
                                     continue; 
                                 }
-
+                                
+                        this.progressHtml += '<p class="text-blue-700">Número de campos correcto...</p>';
                                 const respuestaCorrecta = parseInt(fields[12]); 
                                 if (isNaN(respuestaCorrecta) || respuestaCorrecta < 1 || respuestaCorrecta > 4) {
                                     const truncatedLine = line.length > 100 ? line.substring(0, 100) + '...' : line;
                                     this.errors.push([`Línea ${i + 1}`, `Valor inválido para 'respuesta_correcta' (debe ser 1, 2, 3 o 4). Valor: '${fields[12]}'`, truncatedLine]);
                                 }
+                        this.progressHtml += '<p class="text-blue-700">`Valor válido respuesta_correcta...`</p>';
+
+                                const respuestaCarreraId = parseInt(fields[13]); 
+                                if (isNaN(respuestaCarreraId) || respuestaCarreraId < 1 ) {
+                                    const truncatedLine = line.length > 100 ? line.substring(0, 100) + '...' : line;
+                                this.errors.push([`Línea ${i + 1}`, `Valor inválido para 'career_id' (debe ser 1 o 2 o 3 o ...). Valor: '${fields[13]}'`, truncatedLine]);
+                                }
+                        this.progressHtml += '<p class="text-blue-700">Valor válido para career_id "</p>';
                             }
                         }
-                        
+                    this.progressHtml += '<p class="text-blue-700">pre erorres ...</p>';
                         this.renderErrors(); 
                     };
                     reader.readAsText(this.file);
                 },
-
+           
                 renderErrors() {
                     if (this.errors.length > 0) {
                         this.progressHtml += `<p class="text-red-600 font-bold mt-4">${this.errors.length} errores encontrados. Por favor, corrígelos.</p>`;
@@ -263,7 +276,7 @@
                             } else {
                                 inQuote = !inQuote;
                             }
-                        } else if (char === ',' && !inQuote) {
+                        } else if (char === ';' && !inQuote) {
                             fields.push(currentField.trim());
                             currentField = '';
                         } else {
@@ -295,5 +308,4 @@
             }
         }
     </script>
-    @endpush
 </x-app-layout>

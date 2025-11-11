@@ -7,11 +7,14 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            {{-- Notificaciones Flash --}}
-            @if(session('status')) <div class="mb-6 ...">{{ session('status') }}</div> @endif
+            {{-- Notificaciones Flash 
+            {{ 'INDEX' }}
+            {{ $pendingQuestions }}--}}
+            @if(session('status')) <div class="mb-6 bg-green-100 border-l-4 border-green-500 text-green-700 p-4">{{ session('status') }}</div> @endif
             
             {{-- Aquí cargamos nuestro nuevo componente dinámico de Livewire --}}
-            @livewire('validator-dashboard')
+            @livewire('validator-dashboard',['pendingQuestions' => $pendingQuestions])
+            
         </div>
     </div>
 </x-app-layout>

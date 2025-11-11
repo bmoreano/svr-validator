@@ -1,10 +1,13 @@
-stem,bibliography,grado_dificultad,poder_discriminacion,opcion_1,argumentacion_1,opcion_2,argumentacion_2,opcion_3,argumentacion_3,opcion_4,argumentacion_4,respuesta_correcta
+stem,bibliography,grado_dificultad,poder_discriminacion,opcion_1,argumentacion_1,opcion_2,argumentacion_2,opcion_3,argumentacion_3,opcion_4,argumentacion_4,respuesta_correcta,career_id
+
 
 
 Guía para el Usuario (Explicación de las Columnas)
 Columna	                Descripción	                                                                            Obligatorio	Valores Permitidos/Ejemplo
 stem	                El enunciado completo de la pregunta.	                                                Sí	        "¿Cuál es la capital de Francia?"
 bibliography	        La fuente bibliográfica que respalda la pregunta y la respuesta.	                    Sí	        "Manual de Geografía Mundial, 2023"
+grado_dificultad	    El nivel de dificultad percibido para la pregunta.	                                    Sí	        muy_facil, facil, dificil, muy_dificil
+poder_discriminacion	La capacidad de la pregunta para diferenciar entre estudiantes que saben y los que no.	Sí	        muy_alto, alto, moderado, bajo, muy_bajo
 opcion_1	            El texto de la primera opción de respuesta.	                                            Sí	        "Berlín"
 argumentacion_1	        La justificación de por qué la opción 1 es correcta o incorrecta.	                    Sí	        "Capital de Alemania, no de Francia."
 opcion_2	            El texto de la segunda opción de respuesta.	                                            Sí	        "París"
@@ -14,12 +17,11 @@ argumentacion_3	        La justificación de la opción 3.	                     
 opcion_4	            El texto de la cuarta opción de respuesta.	                                            Sí	        "Madrid"
 argumentacion_4	        La justificación de la opción 4.	                                                    Sí	        "Capital de España."
 respuesta_correcta	    El número de la opción que es la respuesta correcta (1, 2, 3 o 4).	                    Sí	        2 (porque "París" es la opción 2)
-grado_dificultad	    El nivel de dificultad percibido para la pregunta.	                                    Sí	        muy_facil, facil, dificil, muy_dificil
-poder_discriminacion	La capacidad de la pregunta para diferenciar entre estudiantes que saben y los que no.	Sí	        muy_alto, alto, moderado, bajo, muy_bajo
+respuesta_correcta	    El identificador único de la carrera entero sin signo                                   Sí	        1 or 2 or 3 ...
 
 Instrucciones Clave:
-Cabeceras:          No modifiques la primera fila del archivo, que contiene los nombres de las columnas.
-Comillas:           Si el texto de tu enunciado o de una opción contiene comas (,), asegúrate de encerrar todo el texto de esa celda entre comillas dobles ("). 
+Cabeceras:          No modifique la primera fila del archivo, que contiene los nombres de las columnas.
+Comillas:           Todo texto entre comillas dobles ("), es decir, las primeras 14 columnas entre comillas dobles.  
 Número de Opciones: Debes proporcionar exactamente 4 opciones de respuesta.
-Argumentaciones:    No son opcionales, recomendadas para la calidad del reactivo.
+Argumentaciones:    No son opcionales, determinan la calidad del reactivo.
 Codificación:       Guarda el archivo con codificación UTF-8 para asegurar que las tildes y otros caracteres especiales se lean correctamente.

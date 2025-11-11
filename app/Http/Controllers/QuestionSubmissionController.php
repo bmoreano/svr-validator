@@ -29,7 +29,7 @@ class QuestionSubmissionController extends Controller
             
             // Despachamos el único Job, pasándole el nombre del motor
             ValidateQuestionJob::dispatch(
-                $question->id,
+                $question,
                 $validated['ai_engine'],
                 $validated['prompt_id'] ?? null
             )->onQueue('high'); // Usamos la cola de alta prioridad   

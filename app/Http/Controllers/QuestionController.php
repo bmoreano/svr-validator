@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\QuestionSubmittedForValidation;
 use App\Models\Question;
 use App\Models\Prompt;
 use App\Models\Career;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rule;
+use Log;
 
 class QuestionController extends Controller
 {
@@ -86,7 +88,7 @@ class QuestionController extends Controller
                 'bibliography' => $validated['bibliography'],
                 'status' => 'borrador',
                 'career_id' => $validated['career_id'],
-                'tema' => $validated['tema'],
+                //'tema' => $validated['tema'],
                 'grado_dificultad' => $validated['grado_dificultad'],
                 'poder_discriminacion' => $validated['poder_discriminacion'],
             ]);
@@ -187,5 +189,35 @@ class QuestionController extends Controller
         $this->authorize('delete', $question);
         $question->delete();
         return redirect()->route('questions.index')->with('status', 'Pregunta eliminada exitosamente.');
+    }
+
+    /**
+     * Permite a un autor enviar una pregunta para validación por IA.
+     *
+     * @param \App\Models\Question $question
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function submitForAIVAlidation(Question $question): RedirectResponse
+    {
+        // COMENTARIO: Asegurarse de que solo el autor de la pregunta pueda enviarla o un admin.
+        if (Auth::id() !== $question->author_id && (!Auth::user() || !Auth::user()->hasRole('administrador'))) {
+            return redirect()->back()->with('error', 'No tienes permiso para realizar esta acción.');
+        }
+
+        // COMENTARIO: La pregunta debe estar en un estado donde sea elegible para validación AI
+        if ($question->status !== 'borrador' && $question->status !== 'necesita_correccion') {
+            return redirect()->back()->with('error', 'La pregunta no se puede enviar a validación AI en su estado actual.');
+        }
+
+        // COMENTARIO: Cambiar el estado de la pregunta a 'en_validacion_ai'
+        $question->status = 'en_validacion_ai';
+        $question->save();
+
+        // COMENTARIO: Disparar el evento para iniciar el proceso de validación en segundo plano.
+        QuestionSubmittedForValidation::dispatch($question);
+
+        Log::info("Pregunta ID: {$question->id} ha sido enviada para validación AI por el usuario ID: " . (Auth::id() ?? 'Desconocido'));
+
+        return redirect()->back()->with('status', 'La pregunta ha sido enviada para validación automática. Recibirás una notificación con el resultado.');
     }
 }

@@ -3,7 +3,7 @@
     <div class="flex justify-end items-center mb-4 px-4 py-2 bg-gray-50 rounded-lg border">
         @if($filterByMyCareer && !auth()->user()->career_id)
             <span class="mr-4 text-xs text-yellow-700 italic">
-                El filtro "mi carrera" está activo, pero tu perfil no tiene una carrera asignada.
+                El filtro "mi carrera" está activo, pero tu perfil no tiene una carrera asignada. 
             </span>
         @endif
         <label for="careerFilter" class="flex items-center cursor-pointer">
@@ -17,6 +17,8 @@
         <style> input:checked ~ .dot { transform: translateX(100%); } input:checked ~ .block { background-color: #4f46e5; } </style>
     </div>
 
+            {{ 'livewire' }}
+            {{  $pendingQuestionslivewire }}
     <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -46,7 +48,7 @@
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                    @forelse ($pendingQuestions as $question)
+                    @forelse ($pendingQuestionslivewire as $question)
                         <tr class="hover:bg-gray-50">
                             {{-- ========================================================== --}}
                             {{-- 2. CONTENIDO DE CELDA MODIFICADO --}}
@@ -73,9 +75,9 @@
             </table>
         </div>
 
-        @if ($pendingQuestions->hasPages())
+        @if ($pendingQuestionslivewire->hasPages())
             <div class="p-4 bg-gray-50 border-t">
-                {{ $pendingQuestions->links() }}
+                {{ $pendingQuestionslivewire->links() }}
             </div>
         @endif
     </div>

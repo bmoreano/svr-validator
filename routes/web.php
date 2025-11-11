@@ -68,7 +68,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/questions/{question}/compare', [ComparisonController::class, 'show'])
         ->name('questions.compare');
-
+    
     // --- GRUPO DE RUTAS SOLO PARA AUTORES ---
     // El administrador ya no tiene acceso a estas rutas de creación.
     Route::middleware(['role:autor'])->group(function () {
@@ -90,7 +90,8 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::get('/questions/{question}/edit', [QuestionController::class, 'edit'])->name('questions.edit');
         Route::put('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
         Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
-        Route::post('questions/{question}/compare-submit', ComparisonSubmissionController::class)->name('questions.compare.submit');
+        Route::post('questions/{question}/compare-submit', [ComparisonSubmissionController::class])->name('questions.compare.submit');
+        Route::post('/questions/{question}/submit-for-ai-validation', [QuestionController::class, 'submitForAIVAlidation'])->name('questions.submit-for-ai');
     });
 
     // Ver una pregunta es accesible a todos los roles logueados.

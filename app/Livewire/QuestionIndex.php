@@ -35,7 +35,7 @@ class QuestionIndex extends Component
         
         $questions = $query->with($relationsToLoad)->latest()->paginate(15);
 
-        return view('livewire.question-index', [
+        return view('livewire.question.index', [
             'questions' => $questions,
             'prompts' => $activePrompts,
         ]);

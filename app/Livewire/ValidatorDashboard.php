@@ -48,12 +48,16 @@ class ValidatorDashboard extends Component
         }
 
         // 4. Cargamos relaciones y paginamos.
-        $pendingQuestions = $query->latest('updated_at')
+        // -> CORRECCIÓN 1: Se elimina la inicialización de $pendingQuestions como string.
+        // -> CORRECCIÓN 2: El resultado de la consulta se asigna a la variable $pendingQuestions.
+        // -> CORRECCIÓN 3: Se elimina el filtro contradictorio de 'borrador'.
+        $pendingQuestions = $query->latest('updated_at') // Ordenar por la actualización más reciente
                                   ->with(['author', 'career'])
                                   ->paginate(10, ['*'], 'validationsPage');
 
+        // -> CORRECCIÓN 4: Se pasa la variable correcta a la vista.
         return view('livewire.validator-dashboard', [
-            'pendingQuestions' => $pendingQuestions,
+            'pendingQuestionslivewire' => $pendingQuestions,
         ]);
     }
 }

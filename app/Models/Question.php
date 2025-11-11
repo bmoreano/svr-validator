@@ -4,118 +4,92 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\Option;
+use Illuminate\Support\Facades\Crypt; 
+use Illuminate\Database\Eloquent\Casts\Attribute; 
 
-/**
- * Representa un reactivo o pregunta de opción múltiple en el sistema.
- * 
- * Es la entidad central del proceso de creación y validación.
- * 
- * App\Models\Question
- *
- * @property int $id
- * @property int $author_id
- * @property string $stem
- * @property string $status
- * @property string|null $bibliography
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\User $author
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Option> $options
- * @property-read int|null $options_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Validation> $validations
- * @property-read int|null $validations_count
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question whereAuthorId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question whereBibliography($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question whereStatus($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question whereStem($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Question whereUpdatedAt($value)
- * @mixin \Eloquent
- */
 class Question extends Model
 {
     use HasFactory;
 
-    /**
-     * Los atributos que se pueden asignar masivamente.
-     * Estos son los campos que se pueden llenar al crear o actualizar una pregunta.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
-        'code', 
+        'code',
         'author_id',
         'career_id',
+        'assigned_validator_id',
+        'tema',
         'stem',
-        'status',
         'bibliography',
-        'corregido_administrador', 
-        'comentario_administrador', 
         'grado_dificultad',
         'poder_discriminacion',
+        'status',
+        'revision_feedback',
+        'content_hash',
+        'corregido_administrador', 
+        'comentario_administrador',
+        'embedding_vector',
+        'validation_report',
     ];
 
-    /**
-     * Los atributos que deben ser casteados a tipos nativos.
-     * Añadimos los campos a encriptar.
-     */
     protected $casts = [
-        'stem' => 'encrypted',
-        'bibliography' => 'encrypted',
-        'corregido_administrador' => 'array', 
+        'embedding_vector' => 'array',
+        'validation_report' => 'array',
+        'corregido_administrador' => 'boolean',
     ];
 
-
-    /**
-     * Define la relación inversa: Una pregunta pertenece a un único autor (User).
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function author(): BelongsTo
+    public function options()
     {
-        // Esta relación permite hacer $question->author para obtener el usuario que creó la pregunta.
-        // Laravel buscará la llave foránea 'author_id' por convención.
+        return $this->hasMany(Option::class);
+    }
+    
+    public function author()
+    {
         return $this->belongsTo(User::class, 'author_id');
     }
 
-    /**
-     * Define la relación: Una pregunta tiene muchas opciones de respuesta.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function options(): HasMany
+    public function career()
     {
-        // Esta relación permite hacer $question->options para obtener una colección de
-        // todas las opciones (distractores y respuesta correcta) asociadas a esta pregunta.
-        return $this->hasMany(Option::class);
+        return $this->belongsTo(Career::class);
     }
 
-    /**
-     * Define la relación: Una pregunta puede tener muchas sesiones de validación.
-     * (Por ejemplo, una validación de la IA, y luego una o más validaciones humanas).
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function validations(): HasMany
+    public function assignedValidator()
     {
-        // Esta relación permite hacer $question->validations para obtener el historial
-        // completo de todas las validaciones que se han realizado para esta pregunta.
+        return $this->belongsTo(User::class, 'assigned_validator_id');
+    }
+
+    // COMENTARIO: Nueva relación: una pregunta puede tener muchas validaciones
+    public function validations()
+    {
         return $this->hasMany(Validation::class);
     }
 
+    protected function stem(): Attribute
+    {
+        return Attribute::make(
+            get: fn (string $value) => $value ? Crypt::decryptString($value) : null,
+            set: fn (string $value) => $value ? Crypt::encryptString($value) : null,
+        );
+    }
 
-/*  
-    Aquí puedes añadir métodos adicionales para lógica de negocio específica,
-*/
-    public function correctOption(): ?Option{ return $this->options()->where('is_correct', true)->first();} 
-    public function assignedValidator(){ return $this->belongsTo(User::class, 'assigned_validator_id'); }
-    public function career(): BelongsTo { return $this->belongsTo(Career::class); }
-    public function revisions() { return $this->hasMany(QuestionRevision::class)->latest(); }
+    protected function bibliography(): Attribute
+    {
+        return Attribute::make(
+            get: fn (string $value) => $value ? Crypt::decryptString($value) : null,
+            set: fn (string $value) => $value ? Crypt::encryptString($value) : null,
+        );
+    }
+
+    
+    /**
+     * Define la relación con las revisiones de la pregunta.
+     * Asumiendo que tienes un modelo Revision y una tabla 'revisions'.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function revisions()
+    {
+        // Esto asume que tienes un modelo QuestionRevision y que tiene una foreign key 'question_id'
+        // Si tu modelo de revisiones se llama diferente (ej. QuestionRevision), ajústalo.
+        // También si la foreign key se llama diferente.
+        return $this->hasMany(QuestionRevision::class); 
+    }
 }

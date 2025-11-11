@@ -14,7 +14,10 @@ class ValidationController extends Controller
 {
     public function index(): View
     {
-        return view('validations.index');
+        $pendingQuestions = Question::where('status','=','borrador');
+        $pendingQuestions = $pendingQuestions->get();
+        logger('pendingQuestions: '.$pendingQuestions->count());
+        return view('validations.index',compact('pendingQuestions'));
     }
     public function review(Question $question): View
     {

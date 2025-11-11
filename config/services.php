@@ -40,5 +40,17 @@ return [
     
     'openai' => [ 
         'api_key' => env('OPENAI_API_KEY'),
+        'embedding_model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
     ],
+
+
+    'google' => [
+        'api_key' => env('GOOGLE_SEARCH_API_KEY'),
+        'custom_search_cx' => env('GOOGLE_SEARCH_CX'),
+    ],
+
+    'copyscape' => [
+        'key' => env('COPYSCAPE_API_KEY'),
+        'username' => env('COPYSCAPE_USERNAME'),
+    ],    
 ];

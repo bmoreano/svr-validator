@@ -1,0 +1,1 @@
+<img src="<?php echo e(asset('images/caces-logo.png')); ?>" alt="Logo CACES" <?php echo e($attributes); ?>><?php /**PATH C:\Users\byron.moreano\Herd\svr-validator08102025\resources\views/components/application-mark.blade.php ENDPATH**/ ?>
