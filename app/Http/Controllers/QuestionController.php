@@ -2,217 +2,363 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\QuestionSubmittedForValidation;
 use App\Models\Question;
 use App\Models\Prompt;
 use App\Models\Career;
-use App\Services\QuestionService;
-use App\Services\QuestionVersioningService;
+use App\Models\User;
 use App\Services\QuestionCodeGeneratorService;
-use Illuminate\Http\Request;
+use App\Services\QuestionVersioningService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\Rule;
+use Log;
 
 class QuestionController extends Controller
 {
+    // Proporciona los métodos de autorización como $this->authorize()
     use AuthorizesRequests;
 
-    protected $versioningService;
-
-    public function __construct(QuestionVersioningService $versioningService)
-    {
-        $this->versioningService = $versioningService;
-    }
-
     /**
-     * Muestra el dashboard principal, que es el índice de preguntas.
+     * Muestra una lista paginada de preguntas.
+     * Muestra una lista de TODAS las preguntas del sistema para el administrador,
+     * con capacidades de filtrado y ordenación.
      */
-    public function index()
+    public function index(Request $request): View
     {
-        // El índice ahora se maneja aquí.
-        // Devolvemos la vista 'dashboard' porque es la que
-        // contiene el componente @livewire('question-index')
-        return view('dashboard');
+
+        $activePrompts = Prompt::where('status', 'active')->where('is_active', true)->orderBy('name')->get();
+        $authorize = $this->authorize('viewAny', Question::class);
+        //dd($authorize);
+        $user = Auth::user();
+
+        // La consulta base ahora depende del rol.
+        if ($user->role === 'administrador') {
+            // El admin ve TODAS las preguntas.
+            $query = Question::with('author')->latest();
+        } else {
+            // El autor solo ve SUS preguntas.
+            $query = $user->questions()->latest();
+        }
+
+        // --- 1. Definir Opciones Válidas para Filtros y Ordenación ---
+        // Definimos aquí los valores permitidos para usarlos tanto en la validación
+        // como para pasarlos a la vista.
+        $authors = User::whereIn('role', ['autor', 'administrador'])->orderBy('name')->pluck('name', 'id');
+        $careers = Career::where('is_active', true)->orderBy('name')->pluck('name', 'id');
+        $statuses = [
+            'borrador' => 'Borrador',
+            'en_validacion_ai' => 'En Validación IA',
+            'revisado_por_ai' => 'Revisado por IA',
+            'necesita_correccion' => 'Necesita Corrección',
+            'en_validacion_comparativa' => 'En Validacion Comparativa',
+            'fallo_comparativo' => 'fallo_comparativo',
+            'error_validacion_ai' => 'Error de Validación',
+            'aprobado' => 'Aprobado',
+            'en_revision_humana' => 'En Revision Humana',
+            'revision_feedback' => 'Retroalimentación',
+            'corregido_por_admin' => 'Corregido por el administrador',
+            'rechazado_permanentemente' => 'Rechazado Permanentemente',
+        ];
+        $sortableColumns = ['id', 'author_id', 'status', 'created_at'];
+
+        // --- 2. Validación de los Parámetros GET ---
+        $validated = $request->validate([
+            // Filtros: deben ser opcionales ('nullable')
+            'filter_author' => ['nullable', 'integer', Rule::in($authors->keys())],
+            'filter_status' => ['nullable', 'string', Rule::in(array_keys($statuses))],
+            'filter_career' => ['nullable', 'integer', Rule::in($careers->keys())],
+            'filter_date_from' => ['nullable', 'date'],
+            'filter_date_to' => ['nullable', 'date', 'after_or_equal:filter_date_from'],
+
+            // Ordenación: deben ser opcionales y estar en nuestra lista blanca
+            'sort_by' => ['nullable', 'string', Rule::in($sortableColumns)],
+            'sort_direction' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
+        ]);
+        // --- 3. Construir la consulta base ---
+        /**$query = Question::query();
+        // Si el usuario NO es administrador, restringimos la consulta a sus propias preguntas.
+        if ($user->rol !== 'administrador') {
+            $query->where('autor_id', $user->id);
+        }
+
+        // Siempre cargamos la relación 'author' para evitar N+1 queries en la vista.
+        $query->with('author');
+
+
+
+        // ////////////*****************  */
+        $query = '';
+        logger('query: ' . print_r($query, true));
+        logger('user->role: ' . $user->role);
+        if ($user->role === 'autor') {
+            $query = Auth::user()->questions()->with('author');
+            logger('SQL Query: ' . $query->toSql());
+        }
+        if ($user->role === 'administrador') {
+            $query = Question::with('author');
+        }
+        //logger('SQL Query: ' . $query);
+        // --- 4. Aplicar Filtros (lógica idéntica al controlador original) ---
+        if ($request->filled('filter_author')) {
+            $query->where('author_id', $request->input('filter_author'));
+        }
+        if ($request->filled('filter_status')) {
+            $query->where('status', $request->input('filter_status'));
+        }
+        if ($request->filled('filter_career')) {
+            $query->where('career_id', $request->input('filter_career'));
+        }
+        if ($request->filled('filter_date_from')) {
+            $query->whereDate('created_at', '>=', $request->input('filter_date_from'));
+        }
+        if ($request->filled('filter_date_to')) {
+            $query->whereDate('created_at', '<=', $request->input('filter_date_to'));
+        }
+
+        // --- 5. Aplicar Ordenación (lógica idéntica) ---
+        $sortableColumns = ['id', 'author_id', 'status', 'created_at'];
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortDirection = $request->input('sort_direction', 'desc');
+        // -- validar la dirección --
+        if (!in_array(strtolower($sortDirection), ['asc', 'desc'])) {
+            $sortDirection = 'desc';
+        }
+        if (in_array($sortBy, $sortableColumns, false)) {
+            $query->orderBy($sortBy, $sortDirection);
+        }
+
+        // --- 5. Ejecutar la Consulta y Paginar ---
+        $questions = $query->paginate(5)->withQueryString();
+        logger('SQL Query: ' . $query->toSql());
+
+        // --- 6. Pasar TODOS los Datos Necesarios a la Vista ---
+        return view('admin.questions.index', [
+            'prompts' => $activePrompts,
+            'questions' => $questions,
+            'authors' => $authors,
+            'statuses' => $statuses,
+            'careers' => $careers,
+            'filters' => $request->all(),
+        ]);
     }
+
     /**
      * Muestra el formulario para crear una nueva pregunta.
      */
-    public function create()
+    public function create(): View
     {
         $this->authorize('create', Question::class);
-        $careers = Career::orderBy('name')->get();
+        $careers = Career::where('is_active', true)->orderBy('name')->get();
         return view('admin.questions.create', compact('careers'));
     }
 
     /**
-     * Almacena una nueva pregunta en la base de datos.
+     * Guarda una nueva pregunta en la base de datos y crea su primera revisión.
      */
-    public function store(Request $request, QuestionCodeGeneratorService $codeGenerator)
+    public function store(Request $request, QuestionVersioningService $versioningService, QuestionCodeGeneratorService $codeGenerator): RedirectResponse
     {
         $this->authorize('create', Question::class);
 
-        $validated = request()->validate([
-            'career_id' => 'required|exists:careers,id',
-            'stem' => 'required|string',
-            'bibliography' => 'nullable|string',
-            'options' => 'required|array|min:2',
-            'options.*.text' => 'required|string',
-            'options.*.is_correct' => 'nullable|boolean',
-            'correct_option' => 'required|integer|min:0',
+        $validated = $request->validate([
+            'stem' => 'required|string|min:20',
+            'bibliography' => 'required|string|min:10',
+            'career_id' => 'required|integer|exists:careers,id',
+            'tema' => 'nullable|string|max:255',
+            'options' => 'required|array|size:4',
+            'options.*.text' => 'required|string|min:1',
+            'options.*.argumentation' => 'nullable|string|max:1000',
+            'correct_option' => 'required|integer|in:0,1,2,3',
+            'grado_dificultad' => ['required', Rule::in(['muy_facil', 'facil', 'dificil', 'muy_dificil'])],
+            'poder_discriminacion' => ['required', Rule::in(['muy_alto', 'alto', 'moderado', 'bajo', 'muy_bajo'])],
         ]);
 
-        $question = Question::create([
-            'author_id' => Auth::id(),
-            'career_id' => $validated['career_id'],
-            'stem' => $validated['stem'],
-            'bibliography' => $validated['bibliography'],
-            'status' => 'borrador',
-        ]);
+        DB::transaction(function () use ($validated, $versioningService, $codeGenerator) {
+            $author = Auth::user();
+            $newCode = $codeGenerator->generateForNewQuestion($author);
 
-        $question->refresh();
-        // Generar código único
-        $question->code = $codeGenerator->generateForNewQuestion($question);
-        $question->save();
-
-        foreach ($validated['options'] as $index => $optionData) {
-            $question->options()->create([
-                'text' => $optionData['text'],
-                'is_correct' => ($index == $validated['correct_option']),
+            $question = $author->questions()->create([
+                'code' => $newCode,
+                'stem' => $validated['stem'],
+                'bibliography' => $validated['bibliography'],
+                'status' => 'borrador',
+                'career_id' => $validated['career_id'],
+                'tema' => $validated['tema'],
+                'grado_dificultad' => $validated['grado_dificultad'],
+                'poder_discriminacion' => $validated['poder_discriminacion'],
             ]);
-        }
 
-        return redirect()->route('questions.show', $question)
-            ->with('status', 'Reactivo creado exitosamente con el código: ' . $question->code);
+            foreach ($validated['options'] as $index => $optionData) {
+                $question->options()->create([
+                    'option_text' => $optionData['text'],
+                    'is_correct' => ($index == $validated['correct_option']),
+                    'argumentation' => $optionData['argumentation'],
+                ]);
+            }
+
+            $versioningService->createRevision($question->fresh(), 'Creación Inicial');
+        });
+
+        return redirect()->route('questions.index')->with('status', 'Pregunta creada exitosamente como borrador.');
     }
 
     /**
-     * Muestra el detalle de una pregunta específica.
+     * Muestra los detalles de una pregunta específica.
      */
-    public function show(Question $question)
+    public function show(Question $question): View
     {
         $this->authorize('view', $question);
-
-        // Aseguramos que siempre tengamos una instancia de Question
-        $question->load([
-            'options',
-            'author',
-            'career',
-            'validations.validator',
-            'validations.responses.criterion'
-        ]);
-
-        // --- INICIO DE LA SOLUCIÓN ---
-        // 1. Verificar qué motores de IA tienen una API key configurada.
-        // Usamos config() para leer de /config/openai.php y /config/gemini.php
-        $availableEngines = [];
-
-        // Revisamos si la API key de OpenAI (ChatGPT) está presente
-        if (!empty(config('openai.api_key'))) {
-            $availableEngines['chatgpt'] = 'ChatGPT (OpenAI)';
-        }
-
-        // Revisamos si la API key de Gemini está presente
-        if (!empty(config('gemini.api_key'))) {
-            $availableEngines['gemini'] = 'Gemini (Google)';
-        }
-
-        // 2. Contar cuántos motores están activos
-        $activeEnginesCount = count($availableEngines);
-        // --- FIN DE LA SOLUCIÓN ---
-
-
-        // Lógica para obtener la última validación (IA o Humana)
-        $latestValidation = $question->validations()
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        $humanValidation = $question->validations()
-            ->whereHas('validator', fn($q) => $q->where('role', '!=', 'ia'))
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        // Pasamos las nuevas variables a la vista
-        return view('questions.show', compact(
-            'question',
-            'latestValidation',
-            'humanValidation',
-            'availableEngines', // <-- Pasamos los motores disponibles
-            'activeEnginesCount' // <-- Pasamos el conteo
-        ));
+        $question->load('options', 'author', 'career', 'revisions');
+        return view('admin.questions.show', compact('question'));
     }
+
     /**
-     * Muestra el formulario para editar una pregunta.
+     * Muestra el formulario para editar una pregunta existente.
      */
-    public function edit(Question $question)
+    public function edit(Question $question): View
     {
         $this->authorize('update', $question);
-
-        if ($question->status == 'en_espera') {
-            return redirect()->route('questions.show', $question)
-                ->with('error', 'Esta pregunta está "En Espera" y no puede ser editada. Responde a la notificación para desbloquearla.');
-        }
-
-        $careers = Career::orderBy('name')->get();
+        $question->load('options');
+        $careers = Career::where('is_active', true)->orderBy('name')->get();
         return view('admin.questions.edit', compact('question', 'careers'));
     }
 
     /**
-     * Actualiza una pregunta existente en la base de datos.
+     * Actualiza una pregunta existente y crea una nueva revisión.
      */
-    public function update(Request $request, Question $question)
+    public function update(Request $request, Question $question, QuestionVersioningService $versioningService, QuestionCodeGeneratorService $codeGenerator): RedirectResponse
     {
         $this->authorize('update', $question);
 
         $validated = $request->validate([
-            'career_id' => 'required|exists:careers,id',
-            'stem' => 'required|string',
-            'bibliography' => 'nullable|string',
-            'options' => 'required|array|min:2',
-            'options.*.text' => 'required|string',
-            'options.*.is_correct' => 'nullable|boolean',
-            'correct_option' => 'required|string', // El ID de la opción correcta
+            'stem' => 'required|string|min:20',
+            'bibliography' => 'required|string|min:10',
+            'career_id' => 'required|integer|exists:careers,id',
+            'tema' => 'nullable|string|max:255',
+            'options' => 'required|array|size:4',
+            'options.*.id' => 'nullable|integer|exists:options,id',
+            'options.*.text' => 'required|string|min:1',
+            'options.*.argumentation' => 'nullable|string|max:1000',
+            'correct_option' => 'required|integer|in:0,1,2,3',
+            'grado_dificultad' => ['required', Rule::in(['muy_facil', 'facil', 'dificil', 'muy_dificil'])],
+            'poder_discriminacion' => ['required', Rule::in(['muy_alto', 'alto', 'moderado', 'bajo', 'muy_bajo'])],
         ]);
 
-        // Guardar una revisión antes de actualizar
-        $this->versioningService->createRevision($question, ' Modificación manual');
+        DB::transaction(function () use ($validated, $question, $versioningService, $codeGenerator) {
+            $newCode = $codeGenerator->updateTimestamp($question->code);
 
-        // Actualizar la pregunta
-        $question->update([
-            'career_id' => $validated['career_id'],
-            'stem' => $validated['stem'],
-            'bibliography' => $validated['bibliography'],
-            'status' => 'borrador', // Volver a borrador después de editar
-        ]);
+            $question->update([
+                'code' => $newCode,
+                'stem' => $validated['stem'],
+                'bibliography' => $validated['bibliography'],
+                'career_id' => $validated['career_id'],
+                'grado_dificultad' => $validated['grado_dificultad'],
+                'poder_discriminacion' => $validated['poder_discriminacion'],
+            ]);
 
-        // Actualizar opciones
-        foreach ($validated['options'] as $optionId => $optionData) {
-            $option = $question->options()->find($optionId);
-            if ($option) {
-                $option->update([
-                    'text' => $optionData['text'],
-                    'is_correct' => ($optionId == $validated['correct_option']),
-                ]);
+            $existingOptionIds = [];
+            foreach ($validated['options'] as $index => $optionData) {
+                $option = $question->options()->updateOrCreate(
+                    ['id' => $optionData['id'] ?? null],
+                    [
+                        'option_text' => $optionData['text'],
+                        'is_correct' => ($index == $validated['correct_option']),
+                        'argumentation' => $optionData['argumentation'],
+                    ]
+                );
+                $existingOptionIds[] = $option->id;
             }
-        }
+            $question->options()->whereNotIn('id', $existingOptionIds)->delete();
 
-        return redirect()->route('questions.show', $question)
-            ->with('status', 'Reactivo actualizado exitosamente.');
+            $versioningService->createRevision($question->fresh(), 'Actualización por Autor');
+        });
+
+        return redirect()->route('questions.index')->with('status', 'Pregunta actualizada exitosamente.');
     }
 
     /**
      * Elimina una pregunta de la base de datos.
      */
-    public function destroy(Question $question)
+    public function destroy(Question $question): RedirectResponse
     {
         $this->authorize('delete', $question);
+        $question->delete();
+        return redirect()->route('questions.index')->with('status', 'Pregunta eliminada exitosamente.');
+    }
 
-        try {
-            $question->delete();
-            return redirect()->route('questions.index')
-                ->with('status', 'Reactivo eliminado exitosamente.');
-        } catch (\Exception $e) {
-            return back()->with('error', 'No se pudo eliminar el reactivo. Es posible que tenga validaciones asociadas.');
+    /**
+     * Permite a un autor enviar una pregunta para validación por IA.
+     *
+     * @param \App\Models\Question $question
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function submitForAIVAlidation1(Question $question): RedirectResponse
+    {
+        // COMENTARIO: Asegurarse de que solo el autor de la pregunta pueda enviarla o un admin.
+        if (Auth::id() !== $question->author_id && (!Auth::user() || !Auth::user()->hasRole('administrador'))) {
+            return redirect()->back()->with('error', 'No tienes permiso para realizar esta acción.');
         }
+
+        // COMENTARIO: La pregunta debe estar en un estado donde sea elegible para validación AI
+        if ($question->status !== 'borrador' && $question->status !== 'necesita_correccion') {
+            return redirect()->back()->with('error', 'La pregunta no se puede enviar a validación AI en su estado actual.');
+        }
+
+        // COMENTARIO: Cambiar el estado de la pregunta a 'en_validacion_ai'
+        $question->status = 'en_validacion_ai';
+        $question->save();
+
+        // COMENTARIO: Disparar el evento para iniciar el proceso de validación en segundo plano.
+        QuestionSubmittedForValidation::dispatch($question);
+
+        Log::info("Pregunta ID: {$question->id} ha sido enviada para validación AI por el usuario ID: " . (Auth::id() ?? 'Desconocido'));
+
+        return redirect()->back()->with('status', 'La pregunta ha sido enviada para validación automática. Recibirás una notificación con el resultado.');
+    }
+
+    /**
+     * Permite a un autor enviar una pregunta para validación por IA,
+     * aceptando claves API proporcionadas en el request.
+     *
+     * @param \App\Models\Question $question
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function submitForAIVAlidation(Question $question, Request $request): RedirectResponse
+    {
+        // Validación de las claves API (opcionales)
+        $request->validate([
+            'openai_api_key' => 'nullable|string',
+            'google_search_api_key' => 'nullable|string',
+            'copyscape_api_key' => 'nullable|string',
+        ]);
+
+        // COMENTARIO: Asegurarse de que solo el autor de la pregunta pueda enviarla o un admin.
+        if (Auth::id() !== $question->author_id && (!Auth::user() || !Auth::user()->hasRole('administrador'))) {
+            return redirect()->back()->with('error', 'No tienes permiso para realizar esta acción.');
+        }
+
+        if ($question->status !== 'borrador' && $question->status !== 'necesita_correccion') {
+            return redirect()->back()->with('error', 'La pregunta no se puede enviar a validación AI en su estado actual.');
+        }
+
+        $question->status = 'en_validacion_ai';
+        $question->save();
+
+        // COMENTARIO: Disparar el evento, pasando las claves API obtenidas del request.
+        QuestionSubmittedForValidation::dispatch(
+            $question,
+            $request->input('openai_api_key'),
+            $request->input('google_search_api_key'),
+            $request->input('copyscape_api_key')
+        );
+
+        Log::info("Pregunta ID: {$question->id} ha sido enviada para validación AI por el usuario ID: " . (Auth::id() ?? 'Desconocido'));
+
+        return redirect()->back()->with('status', 'La pregunta ha sido enviada para validación automática. Recibirás una notificación con el resultado.');
     }
 }

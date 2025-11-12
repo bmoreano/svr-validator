@@ -15,7 +15,7 @@ class QuestionIndex extends Component
     // Esto asegura que la paginación de Livewire use los estilos de Tailwind.
     protected $paginationTheme = 'tailwind';
 
-    /** 
+    /**
      * Renderiza el componente.
      * Esta función se ejecuta en la carga inicial y cada vez que el componente se refresca.
      */
@@ -35,9 +35,10 @@ class QuestionIndex extends Component
         
         $questions = $query->with($relationsToLoad)->latest()->paginate(15);
 
-        return view('livewire.question.index', [
+        return view('livewire.question-index', [
             'questions' => $questions,
             'prompts' => $activePrompts,
         ]);
     }
+
 }

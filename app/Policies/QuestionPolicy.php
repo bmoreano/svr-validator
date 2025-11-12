@@ -26,7 +26,7 @@ class QuestionPolicy
 
         // Para cualquier otra habilidad, dejamos que los métodos individuales decidan.
         // Ya no retornamos 'true' aquí para el admin.
-        return null;
+        return true;
     }
 
     /**
@@ -35,7 +35,8 @@ class QuestionPolicy
     public function viewAny(User $user): bool
     {
         // Todos los roles autenticados pueden ver el índice
-        return true;
+        return $user->hasAnyRole([ 'autor', 'administrador']);
+        //return true;
     }
 
     /**

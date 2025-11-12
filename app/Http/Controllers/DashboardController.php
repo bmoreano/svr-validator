@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Laravel\Jetstream\Http\Controllers\Inertia\OtherBrowserSessionsController;
 
 class DashboardController extends Controller
 {
