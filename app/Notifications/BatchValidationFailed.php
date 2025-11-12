@@ -8,18 +8,20 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Bus\Batch; // Importante
 
-class BatchValidationComplete extends Notification implements ShouldQueue
+class BatchValidationFailed extends Notification implements ShouldQueue
 {
     use Queueable;
 
     protected $batch;
+    protected $exception;
 
     /**
      * Crea una nueva instancia de la notificación.
      */
-    public function __construct(Batch $batch)
+    public function __construct(Batch $batch, \Throwable $exception)
     {
         $this->batch = $batch;
+        $this->exception = $exception;
     }
 
     /**
@@ -38,10 +40,12 @@ class BatchValidationComplete extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-                    ->line('¡Buenas noticias! El lote de validación de preguntas ha finalizado.')
-                    ->line('Se procesaron exitosamente ' . $this->batch->totalJobs . ' preguntas.')
-                    ->action('Ver Dashboard', route('dashboard'))
-                    ->line('Gracias por usar nuestra aplicación.');
+                    ->error() // Tono de error
+                    ->line('Ha ocurrido un problema con tu lote de validación.')
+                    ->line('Un job dentro del lote falló y no se pudo completar.')
+                    ->line('Error: ' . $this->exception->getMessage())
+                    ->line('El lote tenía ' . $this->batch->totalJobs . ' trabajos en total.')
+                    ->action('Ir a Preguntas', route('questions.index'));
     }
 
     /**
@@ -52,9 +56,9 @@ class BatchValidationComplete extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
-            'icon' => 'check_circle',
-            'title' => 'Lote Completado',
-            'body' => 'Se procesaron ' . $this->batch->totalJobs . ' preguntas.',
+            'icon' => 'error',
+            'title' => 'Fallo en Lote',
+            'body' => 'El lote de validación de preguntas ha fallado.',
             'url' => route('questions.index'),
         ];
     }

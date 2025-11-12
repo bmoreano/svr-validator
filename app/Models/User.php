@@ -12,7 +12,7 @@ use Laravel\Jetstream\HasTeams;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
+use Spatie\Permission\Traits\HasRoles; 
 /**
  * Representa un usuario en la aplicación. Puede ser un Autor,
  * Validador o Administrador.
@@ -83,6 +83,7 @@ class User extends Authenticatable
     use HasTeams;
     use Notifiable;
     use TwoFactorAuthenticatable;
+    use HasRoles;
 
     /**
      * Los atributos que se pueden asignar masivamente.
@@ -96,6 +97,7 @@ class User extends Authenticatable
         'role', 
         'area_conocimiento',
         'career_id',
+        'activo',
     ];
 
     /**
@@ -121,7 +123,8 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+        'activo' => 'boolean',
+        'password' => 'hashed',
     ];
 
     /**

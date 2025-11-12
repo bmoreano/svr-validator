@@ -3,43 +3,86 @@
 namespace App\Http\Controllers;
 
 use App\Models\Question;
-use Illuminate\Http\RedirectResponse;
+use App\Jobs\ValidateQuestionWithChatGpt;
+use App\Jobs\ValidateQuestionWithGemini;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Validation\Rule;
-use App\Jobs\ValidateQuestionJob;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class QuestionSubmissionController extends Controller
 {
-    public function __invoke(Request $request, Question $question): RedirectResponse
-    {
-        Gate::authorize('submitForValidation', $question);
+    use AuthorizesRequests;
 
+    /**
+     * Maneja la solicitud para enviar una pregunta a validación de IA.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Question  $question
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function __invoke(Request $request, Question $question)
+    {
+        // 1. Autorizar la acción
+        $this->authorize('submit', $question);
+
+        // 2. Validar la entrada del formulario
         $validated = $request->validate([
-            'ai_engine' => ['required', 'string', Rule::in(['chatgpt', 'gemini'])],
-            'prompt_id' => 'nullable|integer|exists:prompts,id',
+            'prompt_id' => 'nullable|exists:prompts,id',
+            'ai_engine' => ['required', 'string', Rule::in(['chatgpt', 'gemini', 'comparative'])],
         ]);
-        if (!in_array($question->status, ['borrador', 'necesita_correccion'])) {
-            return back()->with('error', 'Esta pregunta no se puede enviar a validación en su estado actual.');
+
+        $prompt_id = $validated['prompt_id'] ?? null;
+        $aiEngine = $validated['ai_engine'];
+
+        // 3. Prevenir doble envío si ya está en proceso
+        if (in_array($question->status, ['en_validacion_ai', 'en_validacion_comparativa'])) {
+            return back()->with('error', 'Esta pregunta ya está siendo procesada por la IA.');
         }
 
         try {
-            $question->update(['status' => 'en_validacion_ai']);
-            
-            // Despachamos el único Job, pasándole el nombre del motor
-            ValidateQuestionJob::dispatch(
-                $question,
-                $validated['ai_engine'],
-                $validated['prompt_id'] ?? null
-            )->onQueue('high'); // Usamos la cola de alta prioridad   
+            // 4. Lógica de Despacho
+            if ($aiEngine === 'comparative') {
+                // Opción A: Validación Comparativa
+                $question->update(['status' => 'en_validacion_comparativa']);
+
+                $jobs = [
+                    new ValidateQuestionWithChatGpt($question->id, $prompt_id),
+                    new ValidateQuestionWithGemini($question->id, $prompt_id),
+                ];
+                
+                Bus::batch($jobs)
+                   ->name('Comparative Validation for Q: ' . $question->id)
+                   ->dispatch();
+
+            } else {
+                // Opción B: Validación con un solo motor
+                $question->update(['status' => 'en_validacion_ai']);
+
+                // --- INICIO DE LA SOLUCIÓN ---
+                //
+                // Aquí comprobamos el valor de $aiEngine.
+                // Si es 'gemini', despachamos ValidateQuestionWithGemini.
+                // De lo contrario (else), despachamos ValidateQuestionWithChatGpt.
+                
+                if ($aiEngine === 'gemini') {
+                    ValidateQuestionWithGemini::dispatch($question->id, $prompt_id);
+                } else {
+                    ValidateQuestionWithChatGpt::dispatch($question->id, $prompt_id);
+                }
+
+                // --- FIN DE LA SOLUCIÓN ---
+            }
+
         } catch (\Exception $e) {
-            Log::error('Fallo al enviar la pregunta a validación: ' . $e->getMessage());
-            $question->update(['status' => 'borrador']);
-            return back()->with('error', 'Ocurrió un error al procesar tu solicitud.');
+            report($e);
+            // Revertir el estado si el despacho falla
+            $question->update(['status' => 'borrador']); 
+            return back()->with('error', 'Error al despachar el job de validación: ' . $e->getMessage());
         }
 
-        return redirect()->route('questions.index')
-            ->with('status', "Pregunta enviada a validación con {$validated['ai_engine']}.");
+        // 5. Redirigir con mensaje de éxito
+        return redirect()->route('questions.show', $question)
+            ->with('status', '¡Éxito! La pregunta ha sido enviada a validación de IA.');
     }
 }

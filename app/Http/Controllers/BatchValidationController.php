@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\ProcessBatchFile;
 use App\Models\Question;
+use App\Models\Prompt; // <-- AÑADIR IMPORTACIÓN
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,12 +30,15 @@ class BatchValidationController extends Controller
      */
     public function create(): View
     {
-        // Reutilizamos la QuestionPolicy para verificar si el usuario actual
-        // tiene permiso para crear preguntas. Si no, Laravel lanzará
-        // automáticamente una excepción de autorización (error 403).
         $this->authorize('create', Question::class);
         
-        return view('questions.batch-upload');
+        // --- INICIO DE LA SOLUCIÓN (Flujo completo) ---
+        // Pasamos los prompts a la vista para que el selector pueda mostrarlos.
+        // Asumimos que solo queremos mostrar prompts que ya están 'aprobados'.
+        $prompts = Prompt::where('status', 'aprobado')->orderBy('name')->get();
+        
+        return view('questions.batch-upload', compact('prompts'));
+        // --- FIN DE LA SOLUCIÓN ---
     }
 
     /**
@@ -46,53 +50,39 @@ class BatchValidationController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        // Verificamos de nuevo que el usuario tenga permiso para esta acción.
         $this->authorize('create', Question::class);
 
-        // Se definen las reglas de validación para la solicitud.
-        // Esto asegura que solo se procesen archivos válidos y seguros.
+       
         $validated = $request->validate([
-            // 'reactivos_file' debe ser:
-            // - 'required': Obligatorio en la solicitud.
-            // - 'file': Debe ser un archivo válido.
-            // - 'mimes:csv,txt': Solo se permiten extensiones .csv o .txt.
-            // - 'max:2048': El tamaño máximo del archivo es 2MB (2048 KB).
             'reactivos_file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
-            
-            // 'ai_engine' es obligatorio y su valor debe ser uno de los definidos en la lista.
             'ai_engine' => ['required', 'string', Rule::in(['chatgpt', 'gemini'])],
+            'prompt_id' => 'nullable|exists:prompts,id',
         ], [
-            // Mensajes de error personalizados para una mejor experiencia de usuario.
             'reactivos_file.required' => 'Debes seleccionar un archivo para subir.',
             'reactivos_file.mimes' => 'El archivo debe ser de tipo CSV.',
-            'reactivos_file.max' => 'El archivo no puede pesar más de 2MB.',
+            'reactivos_file.max' => 'El archivo no puede pesar más de 10MB.', // Ajustado a 10240
+            'prompt_id.exists' => 'El prompt seleccionado no es válido.',
         ]);
 
         try {
-            // Guardamos el archivo subido en el disco de almacenamiento de Laravel,
-            // dentro de una carpeta 'batch-uploads' para mantener el orden.
-            // El método store() genera un nombre de archivo único para evitar colisiones.
             $path = $request->file('reactivos_file')->store('batch-uploads');
+            
+            // 2. Obtener el prompt_id (será null si no se envió)
+            $prompt_id = $validated['prompt_id'] ?? null;
 
-            // Despachamos el job principal que procesará el archivo.
-            // Le pasamos la información necesaria para que funcione de forma independiente:
-            // la ruta del archivo, el ID del usuario que lo subió y el motor de IA elegido.
-            // Toda la lógica pesada se delega a este job, que se ejecutará en la cola.
+            // 3. Despachamos el job con los 4 argumentos correctos
             ProcessBatchFile::dispatch(
                 $path,
                 optional(auth())->id,
-                $validated['ai_engine']
+                $validated['ai_engine'],
+                $prompt_id 
             );
 
         } catch (\Exception $e) {
-            // Si algo falla (ej. problemas de permisos de escritura, Redis no disponible),
-            // registramos el error para depuración y notificamos al usuario.
             report($e);
             return back()->with('error', 'No se pudo procesar el archivo en este momento. Por favor, inténtelo de nuevo más tarde.');
         }
 
-        // Si todo sale bien, redirigimos al usuario a su lista de preguntas
-        // con un mensaje de éxito que gestiona sus expectativas.
         return redirect()->route('questions.index')
             ->with('status', '¡Archivo recibido correctamente! Las preguntas se están creando y validando en segundo plano. Este proceso puede tardar varios minutos.');
     }

@@ -19,60 +19,66 @@ class ValidationParserService
 {
     /**
      * Parsea una respuesta JSON de un validador AI y la guarda en la base de datos.
-     *
-     * @param Question $question La pregunta que se está validando.
-     * @param string $jsonResponse La cadena JSON (o similar) recibida de la API.
-     * @param string $engineName El nombre del motor de IA (ej. 'chatgpt', 'gemini').
-     * @return bool True si se guardó con éxito, False en caso de error.
      */
     public function saveAiValidation(Question $question, string $jsonResponse, string $engineName): bool
     {
-        try {
+        try {            
+            logger()->info('cleanedJson: 26 ');
             $cleanedJson = $this->cleanJsonResponse($jsonResponse);
-            if (empty($cleanedJson)) { throw new \InvalidArgumentException('Respuesta de IA vacía o sin JSON.'); }
+            if (empty($cleanedJson)) { throw new \InvalidArgumentException('Respuesta de IA vacía.'); }
 
-            $data = json_decode($cleanedJson, true);
+            $data = json_decode($cleanedJson, true);         
+            logger()->info('data: 31 ');
+
             if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
-                $repairedJson = $this->repairJson($cleanedJson);
-                $data = json_decode($repairedJson, true, 512, JSON_THROW_ON_ERROR);
+                // --- INICIO DE LA CORRECCIÓN ---
+                // Se usa $cleanedJson, que es el JSON limpio, no $jsonResponse.
+                $repairedJson = $this->repairJson($cleanedJson);  
+                // --- FIN DE LA CORRECCIÓN ---
+                
+                $data = json_decode($repairedJson, true, 512, JSON_THROW_ON_ERROR);       
+                logger()->info('repairedJson ->data : 36 ');
             }
             
-            $responses = $data['evaluacion'] ?? $data['criterios'] ?? $data;
-            if (is_array($responses) && !empty($responses) && $this->is_assoc($responses)) {
-                $responses = [$responses];
-            }
-            if (!is_array($responses)) {
-                throw new \InvalidArgumentException('La respuesta JSON no es un array iterable.');
-            }
+            $responses = $data['evaluacion'] ?? $data['criterios'] ?? $data;       
+            logger()->info('responses ->data : 40 ');
+            if (is_array($responses) && !empty($responses) && !is_array(reset($responses))) { $responses = [$responses]; } 
+            logger()->info('cast a arreglo si no lo es responses ->data : 42 ');
+            if (!is_array($responses)) { throw new \InvalidArgumentException('Respuesta JSON no es un array iterable.'); } 
+            logger()->info('Respuesta JSON no es un array iterable. : 44 ');
 
             $aiValidator = User::firstOrCreate(
                 ['email' => 'ai@svr.com'],
-                ['name' => 'AI Validator', 'password' => Hash::make(str()->random(20)), 'role' => 'validador']
+                [
+                    'name' => 'AI Validator',
+                    'password' => Hash::make(str()->random(20)),
+                    'role' => 'validador'
+                ]
             );
-            logger()->info('question', [$question->id, $aiValidator->id, $aiValidator->name,$responses,$engineName]);
-            DB::transaction(function () use ($question, $aiValidator, $responses, $engineName) {
+            logger()->info('aiValidator. : 58 ');
+
+            $aux = DB::transaction(function () use ($question, $aiValidator, $responses, $engineName) {
                 $validation = $question->validations()->create([
                     'validator_id' => $aiValidator->id,
                     'status' => 'completado',
-                    'ai_engine' => $engineName, // Esta línea asegura que se guarde el motor de IA.
+                    'ai_engine' => $engineName,
                 ]);
+                logger()->info('aux. : 66 ');
 
                 foreach ($responses as $responseItem) {
-                    if (!is_array($responseItem)) {
-                        Log::warning("Item inválido omitido.", ['item' => $responseItem]);
-                        continue;
-                    }
+                    if (!is_array($responseItem)) { continue; }
                     $mappedData = $this->mapResponseItem($responseItem);
                     if (is_null($mappedData['criterion_id']) || is_null($mappedData['response'])) {
-                        throw new \InvalidArgumentException('Objeto de respuesta no contiene claves esperadas. Objeto: ' . json_encode($responseItem));
+                        throw new \InvalidArgumentException('Objeto de respuesta no contiene claves esperadas.');
                     }
                     $validation->responses()->create($mappedData);
                 }
+                logger()->info('Objeto de respuesta no contiene claves esperadas.. : 76 ');
             });
 
             return true;
         } catch (\Exception $e) {
-            Log::error("Error al guardar validación AI para pregunta {$question->id}: " . $e->getMessage(), [
+            Log::error("81 Error al guardar validación AI para pregunta {$question->id}: " . $e->getMessage(), [
                 'original_json_response' => $jsonResponse,
             ]);
             return false;
@@ -80,8 +86,7 @@ class ValidationParserService
     }
 
     /**
-     * Limpia una cadena JSON que podría estar envuelta en ```json ... ``` u otro texto.
-     * Es público para poder ser reutilizado por otros servicios (ej. MetaValidatePromptJob).
+     * Limpia una cadena JSON que podría estar envuelta en ```json ... ```.
      */
     public function cleanJsonResponse(string $response): string
     {
@@ -92,6 +97,8 @@ class ValidationParserService
         $endPos = strrpos($response, ']');
         if ($endPos === false) $endPos = strrpos($response, '}');
         if ($endPos === false) return '';
+        logger()->info('response: 91');
+        logger($response);
         
         return substr($response, $startPos, $endPos - $startPos + 1);
     }
@@ -101,10 +108,11 @@ class ValidationParserService
      */
     private function repairJson(string $jsonString): string
     {
-        // Elimina comas finales (trailing commas) de objetos y arrays.
+        // Elimina comas finales (trailing commas) de objetos y arrays
         $jsonString = preg_replace('/,\s*([\}\]])/', '$1', $jsonString);
-        // Añade comas faltantes entre objetos '}' y '"'.
+        // Añade comas faltantes entre objetos '}' y '"' (un patrón común de error)
         $jsonString = preg_replace('/}\s*"/i', '},"', $jsonString);
+        logger()->info('jsonString: ', $jsonString);
         return $jsonString;
     }
 
@@ -114,9 +122,11 @@ class ValidationParserService
     private function mapResponseItem(array $item): array
     {
         $itemLowercase = array_change_key_case($item, CASE_LOWER);
-        return [
+       return [
             'criterion_id' => $itemLowercase['criterion_id'] ?? $itemLowercase['id'] ?? null,
-            'response'     => $this->normalizeResponseValue($itemLowercase['response'] ?? $itemLowercase['cumple'] ?? $itemLowercase['valor'] ?? $itemLowercase['cumplido'] ?? null),
+            'response'     => $this->normalizeResponseValue(
+                $itemLowercase['response'] ?? $itemLowercase['cumple'] ?? $itemLowercase['valor'] ?? $itemLowercase['cumplido'] ?? null
+            ),
             'comment'      => $itemLowercase['comment'] ?? $itemLowercase['justificacion'] ?? $itemLowercase['descripcion'] ?? null,
         ];
     }
@@ -138,6 +148,7 @@ class ValidationParserService
         }
     }
 
+    
     /**
      * Comprueba si un array es asociativo (un objeto) en lugar de una lista.
      */

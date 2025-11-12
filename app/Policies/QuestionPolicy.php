@@ -4,16 +4,38 @@ namespace App\Policies;
 
 use App\Models\Question;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
+use Illuminate\Auth\Access\HandlesAuthorization;
 
 class QuestionPolicy
 {
+    use HandlesAuthorization;
+
+    /**
+     * --- SOLUCIÓN ---
+     * Refactorizamos el 'before' para que ya no intente dar permisos globales.
+     * Solo manejará el caso especial de 'submit' para el admin,
+     * dejando que los otros métodos decidan el resto.
+     */
+    public function before(User $user, string $ability): ?bool
+    {
+        // Si el admin está intentando 'submit', dejamos que el método submit()
+        // (que tiene la lógica de autor inactivo) decida.
+        if ($user->hasRole('administrador') && $ability === 'submit') {
+            return null;
+        }
+
+        // Para cualquier otra habilidad, dejamos que los métodos individuales decidan.
+        // Ya no retornamos 'true' aquí para el admin.
+        return null;
+    }
+
     /**
      * Determina si el usuario puede ver la lista de preguntas.
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['autor', 'administrador']);
+        // Todos los roles autenticados pueden ver el índice
+        return true;
     }
 
     /**
@@ -21,36 +43,53 @@ class QuestionPolicy
      */
     public function view(User $user, Question $question): bool
     {
-        return true;
+        // --- SOLUCIÓN ---
+        // El admin siempre puede ver.
+        if ($user->hasRole('administrador')) {
+            return true;
+        }
+
+        // Un autor solo puede ver sus propias preguntas.
+        if ($user->hasRole('autor')) {
+            return $user->id === $question->author_id;
+        }
+
+        // Validadores y Jefes de Carrera pueden ver.
+        return $user->hasRole('validador') || $user->hasRole('jefe_carrera');
     }
 
     /**
      * Determina si el usuario puede crear preguntas.
-     * REGLA CLAVE: Solo y exclusivamente el rol 'autor'.
      */
     public function create(User $user): bool
     {
-        // Si el rol del usuario no es 'autor', no puede crear.
-        return $user->role === 'autor';
+        // --- SOLUCIÓN ---
+        // El admin puede crear.
+        if ($user->hasRole('administrador')) {
+            return true;
+        }
+        // Los autores también pueden crear.
+        return $user->hasRole('autor');
     }
 
     /**
-     * Determina si el usuario puede actualizar (editar) una pregunta.
-     * Solo se pueden editar preguntas en estado 'borrador'.
+     * Determina si el usuario puede actualizar una pregunta.
+     * (Este era el bug de la imagen)
      */
     public function update(User $user, Question $question): bool
     {
-        $isEditableStatus = in_array($question->status, [
-            'borrador', 
-            'necesita_correccion', 
-            'fallo_comparativo'
-        ]);
-        
-        if ($user->role === 'administrador') {
-            return $isEditableStatus;
+        // 1. El admin puede actualizar SI Y SOLO SI el autor está inactivo
+        if ($user->hasRole('administrador')) {
+            $author = $question->author;
+
+            // Comprueba que el autor exista y que 'activo' sea false
+            if ($author && $author->activo === false) {
+                return true;
+            }
         }
-        
-        return $user->id === $question->author_id && $isEditableStatus;
+
+        // 2. El autor puede actualizar su pregunta SOLO si está en 'borrador'.
+        return $user->id === $question->author_id && $question->status === 'borrador';
     }
 
     /**
@@ -58,57 +97,40 @@ class QuestionPolicy
      */
     public function delete(User $user, Question $question): bool
     {
-        // Aplicamos la misma lógica para la eliminación.
-        $isDeletableStatus = in_array($question->status, [
-            'borrador', 
-            'necesita_correccion', 
-            'fallo_comparativo'
-        ]);
-        
-        if ($user->role === 'administrador') {
-            return $isDeletableStatus;
+        // 1. El admin puede eliminar SI Y SOLO SI el autor está inactivo
+        if ($user->hasRole('administrador')) {
+            $author = $question->author;
+
+            if ($author && $author->activo === false) {
+                return true;
+            }
         }
 
-        return $user->id === $question->author_id && $isDeletableStatus;
+        // 2. El autor puede eliminar su pregunta SOLO si está en 'borrador'.
+        return $user->id === $question->author_id && $question->status === 'borrador';
     }
-    
+
     /**
-     * Determina si el usuario puede eliminar una pregunta.
-     * Solo se pueden eliminar preguntas en estado 'borrador'.
+     * Determina si el usuario puede enviar la pregunta a validación de IA.
+     * (Esta lógica ya era correcta y explícita para el 'autor inactivo').
      */
-    public function delete1(User $user, Question $question): bool
+    public function submit(User $user, Question $question): bool
     {
-        if ($question->status !== 'borrador') {
-            return false;
-        }
-        
-        if ($user->role === 'administrador') {
+        // 1. El autor puede enviar su propia pregunta
+        if ($user->id === $question->author_id) {
             return true;
         }
 
-        if ($user->role === 'autor') {
-            return $user->id === $question->author_id;
+        // 2. Un Admin puede enviar la pregunta SI el autor está inactivo.
+        if ($user->hasRole('administrador')) {
+            $author = $question->author;
+
+            if ($author && $author->activo === false) {
+                return true;
+            }
         }
-        
+
+        // Si no se cumple ninguna condición, se deniega.
         return false;
     }
-    
-
-        // ==========================================================
-        // Determina si el usuario puede enviar la pregunta a validación.
-        // Permitimos que tanto el autor propietario como cualquier administrador
-        // puedan enviar una pregunta a validación si está en el estado correcto.
-        // ==========================================================    
-    public function submitForValidation(User $user, Question $question): bool
-    {
-
-        $isSubmittableStatus = in_array($question->status, ['borrador', 'necesita_correccion', 'fallo_comparativo']);
-        
-        if ($user->role === 'administrador') {
-            return $isSubmittableStatus;
-        }
-
-        return $user->id === $question->author_id && $isSubmittableStatus;
-    }
-
 }

@@ -36,49 +36,44 @@ class FortifyServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+public function boot(): void
     {
         Fortify::createUsersUsing(CreateNewUser::class);
-        Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
-        Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
-        Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
-        Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorAuthenticatable::class);
 
-        RateLimiter::for('login', function (Request $request) {
-            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())) . '|' . $request->ip());
-
-            return Limit::perMinute(5)->by($throttleKey);
+        Fortify::registerView(function () {
+            return view('auth.register');
         });
 
-        RateLimiter::for('two-factor', function (Request $request) {
-            return Limit::perMinute(5)->by($request->session()->get('login.id'));
+        Fortify::loginView(function () {
+            return view('auth.login');
         });
-        /*/ --- LÓGICA DE AUTENTICACIÓN PERSONALIZADA ---
+
+        // Aquí personalizamos el pipeline de autenticación.
+        // Esto se ejecuta DESPUÉS de que Fortify comprueba las credenciales,
+        // pero ANTES de que inicie la sesión del usuario.
+        
         Fortify::authenticateUsing(function (Request $request) {
-            // 1. Encontrar al usuario por su email.
             $user = User::where('email', $request->email)->first();
 
-            // 2. Verificar que el usuario exista Y que la contraseña sea correcta.
             if ($user && Hash::check($request->password, $user->password)) {
-
-                // 3. ¡AQUÍ ESTÁ LA NUEVA REGLA! Verificar el rol del usuario.
-                // Si el rol del usuario es 'validador' (y solo 'validador'),
-                // impedimos el inicio de sesión.
-                if ($user->role === 'validador') {
-                    // Lanzamos el mismo error que si la contraseña fuera incorrecta.
-                    // Esto evita dar información a un posible atacante de por qué falló el login.
+                
+                // REQUISITO 2: Verificar si el usuario está activo
+                if ($user->activo === false) { // o !$user->activo
+                    // Lanzamos una excepción de validación para notificar al usuario.
                     throw ValidationException::withMessages([
-                        'email' => [trans('auth.failed')],
+                        'email' => ['Esta cuenta ha sido desactivada y no puede iniciar sesión.'],
                     ]);
                 }
-
-                // 4. Si todas las comprobaciones pasan, devolvemos el usuario.
-                // Fortify se encargará de iniciar la sesión.
+                
                 return $user;
             }
+        });
 
-            // Si el usuario no existe o la contraseña es incorrecta, Fortify manejará el error.
-            return null;
-        });*/
+
+        RateLimiter::for('login', function (Request $request) {
+            $email = (string) $request->email;
+
+            return Limit::perMinute(5)->by($email.$request->ip());
+        });
     }
 }
