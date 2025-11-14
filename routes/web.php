@@ -17,7 +17,7 @@ use App\Http\Controllers\BulkUploadController;
 use App\Http\Controllers\DocxConverterController;
 use App\Http\Controllers\TextSanitizerController;
 use App\Http\Controllers\PromptExecutionController;
-use App\Http\Controllers\QuestionActionController; 
+use App\Http\Controllers\QuestionActionController;
 
 // Controladores de Admin
 use App\Http\Controllers\Admin\AnalyticsController;
@@ -52,16 +52,14 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
 
     // El dashboard principal. Sigue siendo el "router" central de roles.
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
-    
-    // --- INICIO DE LA SOLUCIÓN ---
-    // Comentamos la redirección que habíamos implementado.
-    // Route::redirect('/questions', '/dashboard')->name('questions.index');
-    // --- FIN DE LA SOLUCIÓN ---
+    // --- Nueva Ruta de Progreso ---
+    // Esta es la página donde el usuario esperará la respuesta de la IA
+    Route::get('questions/{question}/progress', [QuestionController::class, 'progress'])->name('questions.progress');
 
     Route::get('/questions/{question}/compare', [ComparisonController::class, 'show'])
         ->name('questions.compare');
     Route::get('questions/{question}', [QuestionController::class, 'show'])->name('questions.show');
-    
+
     Route::get('/prompts/propose', [PromptProposalController::class, 'create'])->name('prompts.propose');
     Route::post('/prompts/propose', [PromptProposalController::class, 'store'])->name('prompts.propose.store');
 
@@ -92,12 +90,12 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
 
     // --- GRUPO: AUTOR & ADMINISTRADOR ---
     Route::middleware(['role:autor,administrador'])->group(function () {
-        
+
         // --- INICIO DE LA SOLUCIÓN ---
         // Reactivamos la ruta original de /questions.
         Route::get('/questions', [QuestionController::class, 'index'])->name('questions.index');
         // --- FIN DE LA SOLUCIÓN ---
-        
+
         Route::get('/questions/{question}/edit', [QuestionController::class, 'edit'])->name('questions.edit');
         Route::put('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
         Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
@@ -105,9 +103,9 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
 
         // (El resto del archivo de rutas permanece igual)
         // ...
-        Route::prefix('questions-upload')->name('questions-upload.')->group(function () {        
+        Route::prefix('questions-upload')->name('questions-upload.')->group(function () {
             Route::get('/', [BulkUploadController::class, 'create'])->name('create');
-            Route::post('/', [BulkUploadController::class, 'store'])->name('store');        
+            Route::post('/', [BulkUploadController::class, 'store'])->name('store');
             Route::get('/download-template', [BulkUploadController::class, 'downloadQuestionsTemplate'])->name('download.template');
         });
         Route::prefix('bulk-upload')->name('bulk-upload.')->group(function () {
@@ -169,13 +167,13 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
             Route::get('/', [CriteriaUploadController::class, 'create'])->name('create');
             Route::post('/', [CriteriaUploadController::class, 'store'])->name('store');
             Route::get('/download-template', [CriteriaUploadController::class, 'downloadTemplate'])->name('download.template');
-        });    
+        });
 
         Route::patch('/questions/{question}/assign-validator', [QuestionAssignmentController::class, 'assign'])
             ->name('questions.assign_validator');
         Route::patch('/questions/{question}/send-to-review', [QuestionStateController::class, 'sendToReview'])
-            ->name('questions.send_to_review');  
-        
+            ->name('questions.send_to_review');
+
         Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 

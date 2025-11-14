@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Question; // Asegúrate de que tu modelo se llame así
 
-class QuestionsController extends Controller
+class QuestionsController99 extends Controller
 {
     /**
      * Muestra una lista de todas las preguntas.

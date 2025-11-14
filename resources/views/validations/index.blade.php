@@ -11,9 +11,12 @@
             {{ 'INDEX' }}
             {{ $pendingQuestions }}--}}
             @if(session('status')) <div class="mb-6 bg-green-100 border-l-4 border-green-500 text-green-700 p-4">{{ session('status') }}</div> @endif
-            
-            {{-- Aquí cargamos nuestro nuevo componente dinámico de Livewire --}}
-            @livewire('validator-dashboard',['pendingQuestions' => $pendingQuestions])
+             @php
+                // Aseguramos que $pendingQuestions existe y es iterable
+                $pending = $pendingQuestions ?? collect();
+            @endphp
+            {{-- Aquí cargamos nuestro nuevo componente dinámico de Livewire -- }}--}}
+            @livewire('validator-dashboard',['pendingQuestions' => $pending]) 
             
         </div>
     </div>

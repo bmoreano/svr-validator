@@ -1,7 +1,7 @@
 <div wire:poll.10s>
     <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200"> 
+            <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
@@ -75,16 +75,37 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center justify-center space-x-4">
+                                    {{-- Botón VER --}}
                                     @if($question->status !== 'aprobado')
                                         @can('view', $question)
-                                            <a href="{{ route('questions.show', $question) }}" ...><svg ...></svg></a>
+                                            <a href="{{ route('questions.show', $question) }}" class="text-indigo-600 hover:text-indigo-900" title="Ver Detalles">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                            </a>
                                         @endcan
                                     @endif
+                                    
+                                    {{-- Botón ASIGNAR VALIDADOR (Solo Admin) --}}
+                                    @if(auth()->user()->role === 'administrador')
+                                        <button wire:click="openAssignValidatorModal({{ $question->id }})" class="text-teal-600 hover:text-teal-900" title="Asignar Validador">
+                                            {{-- Ícono de Usuario con signo + --}}
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                                            </svg>
+                                        </button>
+                                    @endif
+                                    
+                                    {{-- Botón EDITAR --}}
                                     @can('update', $question)
-                                        <a href="{{ route('questions.edit', $question) }}" ...><svg ...></svg></a>
+                                        <a href="{{ route('questions.edit', $question) }}" class="text-yellow-600 hover:text-yellow-900" title="Editar">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                        </a>
                                     @endcan
+                                    
+                                    {{-- Botón ELIMINAR --}}
                                     @can('delete', $question)
-                                        <form ...><button ...><svg ...></svg></button></form>
+                                        <button wire:click="confirmQuestionDeletion({{ $question->id }})" class="text-red-600 hover:text-red-900" title="Eliminar">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
                                     @endcan
                                 </div>
                             </td>
@@ -99,152 +120,44 @@
             <div class="p-4 bg-gray-50 border-t">{{ $questions->links() }}</div>
         @endif
     </div>
-</div>
 
+    <x-dialog-modal wire:model.live="assigningValidator">
+        <x-slot name="title">
+            Asignar Validador
+        </x-slot>
 
+        <x-slot name="content">
+            <p class="mb-4 text-sm text-gray-600">Selecciona un validador experto para revisar este reactivo.</p>
+            
+            <form id="assign-validator-form" action="{{ $questionToAssignId ? route('admin.questions.assign_validator', $questionToAssignId) : '#' }}" method="POST">
+                @csrf
+                @method('PATCH')
 
-
-
-
-
-
-
-
-
-<div class="p-6 sm:p-8">
-    
-    <div class="flex flex-col md:flex-row justify-between gap-4 mb-6">
-        <h1 class="text-2xl font-semibold text-gray-700 dark:text-gray-200">Mis Reactivos</h1>
-        
-        @can('create', App\Models\Question::class)
-            <a href="{{ route('questions.create') }}" class="btn-primary">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                Crear Reactivo
-            </a>
-        @endcan
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <input wire:model.debounce.300ms="search" type="text" placeholder="Buscar por texto o código..." class="input-form">
-        
-        <select wire:model="filterByStatus" class="input-form">
-            <option value="">Todos los Estados</option>
-            <option value="borrador">Borrador</option>
-            <option value="en_validacion_ai">En Validación AI</option>
-            <option value="revisado_por_ai">Revisado por AI</option>
-            <option value="en_revision_humana">En Revisión Humana</option>
-            <option value="aprobado">Aprobado</option>
-            <option value="rechazado">Rechazado</option>
-        </select>
-        
-        @if(auth()->user()->hasRole('administrador'))
-            <select wire:model="filterByCareer" class="input-form">
-                <option value="">Todas las Carreras</option>
-                @foreach($careers as $career)
-                    <option value="{{ $career->id }}">{{ $career->name }}</option>
-                @endforeach
-            </select>
-        @endif
-    </div>
-
-    <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer" wire:click="sortBy('code')">
-                        Código
-                        @if($sortField === 'code') <span>{{ $sortDirection === 'asc' ? '▲' : '▼' }}</span> @endif
-                    </th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Reactivo (Stem)
-                    </th>
-                    
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Carrera
-                    </th>
-                    @if(auth()->user()->hasRole('administrador'))
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer" wire:click="sortBy('author_id')">
-                            Autor
-                            @if($sortField === 'author_id') <span>{{ $sortDirection === 'asc' ? '▲' : '▼' }}</span> @endif
-                        </th>
-                    @endif
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer" wire:click="sortBy('status')">
-                        Estado
-                        @if($sortField === 'status') <span>{{ $sortDirection === 'asc' ? '▲' : '▼' }}</span> @endif
-                    </th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer" wire:click="sortBy('updated_at')">
-                        Última Modificación
-                        @if($sortField === 'updated_at') <span>{{ $sortDirection === 'asc' ? '▲' : '▼' }}</span> @endif
-                    </th>
-                    <th scope="col" class="relative px-6 py-3">
-                        <span class="sr-only">Acciones</span>
-                    </th>
-                </tr>
-            </thead>
-            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                @forelse($questions as $question)
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            {{ $question->code ?? 'N/A' }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 max-w-xs truncate">
-                            {{ Str::limit(strip_tags($question->stem), 50) }}
-                        </td>
-                        
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                            {{ $question->career?->name ?? 'Sin Carrera' }}
-                        </td>
-                        @if(auth()->user()->hasRole('administrador'))
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                                {{ $question->author?->name ?? 'Usuario Eliminado' }}
-                            </td>
+                <div>
+                    <x-label for="validator_id" value="Validador" />
+                    <select id="validator_id" name="validator_id" class="mt-1 block w-full input-form">
+                        <option value="">Seleccione un validador...</option>
+                        {{-- La variable $validators viene del método render() de la clase Livewire --}}
+                        @if(isset($validators))
+                            @foreach($validators as $validator)
+                                <option value="{{ $validator->id }}">{{ $validator->name }}</option>
+                            @endforeach
                         @endif
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                @switch($question->status)
-                                    @case('borrador') bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200 @break
-                                    @case('en_validacion_ai') bg-blue-100 text-blue-800 dark:bg-blue-600 dark:text-blue-100 @break
-                                    @case('en_validacion_comparativa') bg-purple-100 text-purple-800 dark:bg-purple-600 dark:text-purple-100 @break
-                                    @case('revisado_por_ai') bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-100 @break
-                                    @case('en_revision_humana') bg-orange-100 text-orange-800 dark:bg-orange-600 dark:text-orange-100 @break
-                                    @case('aprobado') bg-green-100 text-green-800 dark:bg-green-600 dark:text-green-100 @break
-                                    @case('rechazado') bg-red-100 text-red-800 dark:bg-red-600 dark:text-red-100 @break
-                                @endswitch
-                            ">
-                                {{ ucfirst(str_replace('_', ' ', $question->status)) }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                            {{ $question->updated_at->diffForHumans() }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a href="{{ route('questions.show', $question) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-200 mr-3">Ver</a>
-                            
-                            @can('update', $question)
-                                <a href="{{ route('questions.edit', $question) }}" class="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-200 mr-3">Editar</a>
-                            @endcan
+                    </select>
+                </div>
+            </form>
+        </x-slot>
 
-                            @can('delete', $question)
-                                <button wire:click="confirmQuestionDeletion({{ $question->id }})" class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-200">
-                                    Eliminar
-                                </button>
-                            @endcan
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="{{ auth()->user()->hasRole('administrador') ? '7' : '6' }}" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                            No se encontraron reactivos que coincidan con su búsqueda.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+        <x-slot name="footer">
+            <x-secondary-button wire:click="$set('assigningValidator', false)" wire:loading.attr="disabled">
+                Cancelar
+            </x-secondary-button>
 
-    <div class="mt-6">
-        {{ $questions->links() }}
-    </div>
+            <x-button class="ml-2" type="submit" form="assign-validator-form" wire:loading.attr="disabled">
+                Asignar
+            </x-button>
+        </x-slot>
+    </x-dialog-modal>
 
     <x-confirmation-modal wire:model.live="confirmingQuestionDeletion">
         <x-slot name="title">
@@ -266,4 +179,4 @@
         </x-slot>
     </x-confirmation-modal>
 
-    </div>
+</div>

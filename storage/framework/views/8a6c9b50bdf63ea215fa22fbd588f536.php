@@ -1,15 +1,25 @@
-<x-app-layout>
-    {{-- ========================================================== --}}
-    {{-- ENCABEZADO DE LA PÁGINA --}}
-    {{-- ========================================================== --}}
-    <x-slot name="header">
+<?php if (isset($component)) { $__componentOriginal9ac128a9029c0e4701924bd2d73d7f54 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54 = $attributes; } ?>
+<?php $component = App\View\Components\AppLayout::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('app-layout'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\App\View\Components\AppLayout::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+    
+    
+    
+     <?php $__env->slot('header', null, []); ?> 
         <div class="flex flex-col sm:flex-row justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight mb-2 sm:mb-0">
-                {{ auth()->user()->role === 'administrador' ? 'Gestión Global de Preguntas' : 'Las Preguntas' }}
+                <?php echo e(auth()->user()->role === 'administrador' ? 'Gestión Global de Preguntas' : 'Las Preguntas'); ?>
+
             </h2>
-            @if (auth()->user()->role === 'autor')
-                @can('create', App\Models\Question::class)
-                    <a href="{{ route('questions.create') }}"
+            <?php if(auth()->user()->role === 'autor'): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('create', App\Models\Question::class)): ?>
+                    <a href="<?php echo e(route('questions.create')); ?>"
                         class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -18,115 +28,115 @@
                         </svg>
                         Crear Nueva Pregunta
                     </a>
-                @endcan
-            @endif
+                <?php endif; ?>
+            <?php endif; ?>
         </div>
-    </x-slot>
+     <?php $__env->endSlot(); ?>
 
     <div class="py-12">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6">
 
-                {{-- ========================================================== --}}
-                {{-- SECCIÓN DE NOTIFICACIONES FLASH (ÉXITO/ERROR) --}}
-                {{-- (SE MANTIENE IGUAL) --}}
-                {{-- ========================================================== --}}
-                @if (session('status'))
+                
+                
+                
+                
+                <?php if(session('status')): ?>
                     <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6"
                         role="alert">
-                        <span class="block sm:inline">{{ session('status') }}</span>
+                        <span class="block sm:inline"><?php echo e(session('status')); ?></span>
                     </div>
-                @endif
-                @if (session('error'))
+                <?php endif; ?>
+                <?php if(session('error')): ?>
                     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6"
                         role="alert">
-                        <span class="block sm:inline">{{ session('error') }}</span>
+                        <span class="block sm:inline"><?php echo e(session('error')); ?></span>
                     </div>
-                @endif
+                <?php endif; ?>
 
-                {{-- ========================================================== --}}
-                {{-- SECCIÓN DE FILTROS --}}
-                {{-- (SE MANTIENE IGUAL, YA ERA FUNCIONAL Y CORRECTO) --}}
-                {{-- ========================================================== --}}
+                
+                
+                
+                
                 <div class="bg-gray-50 border rounded-lg p-4 mb-6">
-                    <form action="{{ route('questions.index') }}" method="GET">
+                    <form action="<?php echo e(route('questions.index')); ?>" method="GET">
                         <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
-                            {{-- Filtro Carrera --}}
+                            
                             <div>
                                 <label for="filter_career"
                                     class="block text-sm font-medium text-gray-700">Carrera</label>
                                 <select name="filter_career" id="filter_career"
                                     class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                                     <option value="">Todas</option>
-                                    @foreach ($careers as $id => $name)
-                                        <option value="{{ $id }}" @selected(request('filter_career') == $id)>
-                                            {{ $name }}</option>
-                                    @endforeach
+                                    <?php $__currentLoopData = $careers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $id => $name): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($id); ?>" <?php if(request('filter_career') == $id): echo 'selected'; endif; ?>>
+                                            <?php echo e($name); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </select>
                             </div>
 
-                            {{-- Filtro Autor --}}
-                            @if (auth()->user()->role === 'administrador')
+                            
+                            <?php if(auth()->user()->role === 'administrador'): ?>
                                 <div>
                                     <label for="filter_author"
                                         class="block text-sm font-medium text-gray-700">Autor</label>
                                     <select name="filter_author" id="filter_author"
                                         class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                                         <option value="">Todos</option>
-                                        @foreach ($authors as $id => $name)
-                                            <option value="{{ $id }}" @selected(request('filter_author') == $id)>
-                                                {{ $name }}</option>
-                                        @endforeach
+                                        <?php $__currentLoopData = $authors; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $id => $name): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <option value="<?php echo e($id); ?>" <?php if(request('filter_author') == $id): echo 'selected'; endif; ?>>
+                                                <?php echo e($name); ?></option>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                     </select>
                                 </div>
-                            @endif
+                            <?php endif; ?>
 
-                            {{-- Filtro Estado --}}
+                            
                             <div>
                                 <label for="filter_status"
                                     class="block text-sm font-medium text-gray-700">Estado</label>
                                 <select name="filter_status" id="filter_status"
                                     class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                                     <option value="">Todos</option>
-                                    @foreach ($statuses as $key => $value)
-                                        <option value="{{ $key }}" @selected(request('filter_status') == $key)>
-                                            {{ $value }}</option>
-                                    @endforeach
+                                    <?php $__currentLoopData = $statuses; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key => $value): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($key); ?>" <?php if(request('filter_status') == $key): echo 'selected'; endif; ?>>
+                                            <?php echo e($value); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </select>
                             </div>
 
-                            {{-- Filtro Fecha Desde --}}
+                            
                             <div>
                                 <label for="filter_date_from"
                                     class="block text-sm font-medium text-gray-700">Desde</label>
                                 <input type="date" name="filter_date_from" id="filter_date_from"
-                                    value="{{ request('filter_date_from') }}"
+                                    value="<?php echo e(request('filter_date_from')); ?>"
                                     class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
                             </div>
 
-                            {{-- Filtro Fecha Hasta --}}
+                            
                             <div>
                                 <label for="filter_date_to"
                                     class="block text-sm font-medium text-gray-700">Hasta</label>
                                 <input type="date" name="filter_date_to" id="filter_date_to"
-                                    value="{{ request('filter_date_to') }}"
+                                    value="<?php echo e(request('filter_date_to')); ?>"
                                     class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
                             </div>
 
-                            {{-- Botones --}}
+                            
                             <div class="flex items-center space-x-2">
                                 <button type="submit"
                                     class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Filtrar</button>
-                                <a href="{{ route('questions.index') }}"
+                                <a href="<?php echo e(route('questions.index')); ?>"
                                     class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Limpiar</a>
                             </div>
                         </div>
                     </form>
                 </div>
 
-                {{-- ========================================================== --}}
-                {{-- TABLA DE PREGUNTAS --}}
-                {{-- ========================================================== --}}
+                
+                
+                
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
@@ -137,11 +147,11 @@
                                 <th
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Carrera</th>
-                                @if (auth()->user()->role === 'administrador')
+                                <?php if(auth()->user()->role === 'administrador'): ?>
                                     <th
                                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Autor</th>
-                                @endif
+                                <?php endif; ?>
                                 <th
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Fecha Creación</th>
@@ -157,30 +167,30 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse ($questions as $question)
+                            <?php $__empty_1 = true; $__currentLoopData = $questions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $question): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                                 <tr>
-                                    {{-- CÓDIGO --}}
+                                    
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                                        {{ Str::limit($question->code, 25) }}</td>
+                                        <?php echo e(Str::limit($question->code, 25)); ?></td>
 
-                                    {{-- CARRERA --}}
+                                    
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {{ $question->career->name ?? 'N/A' }}</td>
+                                        <?php echo e($question->career->name ?? 'N/A'); ?></td>
 
-                                    {{-- AUTOR (Solo para admin) --}}
-                                    @if (auth()->user()->role === 'administrador')
+                                    
+                                    <?php if(auth()->user()->role === 'administrador'): ?>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                            {{ $question->author->name ?? 'N/A' }}</td>
-                                    @endif
+                                            <?php echo e($question->author->name ?? 'N/A'); ?></td>
+                                    <?php endif; ?>
 
 
-                                    {{-- FECHA DE CREACIÓN --}}
+                                    
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {{ $question->created_at->format('Y-m-d H:i') }}</td>
-                                    {{-- ESTADO (Con lógica de color refactorizada) --}}
+                                        <?php echo e($question->created_at->format('Y-m-d H:i')); ?></td>
+                                    
 
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        @php
+                                        <?php
                                             $statusClass = match ($question->status) {
                                                 'aprobado', 'revisado_comparativo' => 'bg-green-100 text-green-800',
                                                 'borrador' => 'bg-gray-200 text-gray-800',
@@ -192,53 +202,36 @@
                                                 'en_revision_humana' => 'bg-blue-100 text-blue-800',
                                                 default => 'bg-yellow-100 text-yellow-800', // para estados en proceso
                                             };
-                                        @endphp
-                                        @if ($question->status === 'error_validacion_ia')
+                                        ?>
+                                        <?php if($question->status === 'error_validacion_ia'): ?>
                                             <div class="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded text-sm"
                                                 role="alert">
                                                 <span
-                                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusClass }}">
-                                                    {{ ucfirst(str_replace('_', ' ', $question->status)) }}</span>
-                                                {{-- Es mejor mostrar el mensaje de error real si lo tienes --}}
+                                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo e($statusClass); ?>">
+                                                    <?php echo e(ucfirst(str_replace('_', ' ', $question->status))); ?></span>
+                                                
                                                 <strong>Error:</strong>
-                                                {{ $question->ia_error_message ?? 'Fallo en la validación' }}
-                                            </div>
-                                        @else
-                                            {{-- Muestra otros estados normalmente --}}
-                                            <span
-                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusClass }}">
-                                                {{ ucfirst(str_replace('_', ' ', $question->status)) }}</span>
-                                        @endif
-                                    </td>
-                                    {{-- <td class="px-6 py-4 whitespace-nowrap">
-                                        @php
-                                            $statusClass = match ($question->status) {
-                                                'aprobado', 'revisado_comparativo' => 'bg-green-100 text-green-800',
-                                                'borrador' => 'bg-gray-200 text-gray-800',
-                                                'necesita_correccion' => 'bg-orange-100 text-orange-800',
-                                                'fallo_comparativo',
-                                                'rechazado_permanentemente',
-                                                'error_validacion_ai'
-                                                    => 'bg-red-100 text-red-800',
-                                                'en_revision_humana' => 'bg-blue-100 text-blue-800',
-                                                default => 'bg-yellow-100 text-yellow-800', // para estados en proceso
-                                            };
-                                        @endphp
-                                        <span
-                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusClass }}">
-                                            {{ ucfirst(str_replace('_', ' ', $question->status)) }}
-                                        </span>
-                                    </td> --}}
+                                                <?php echo e($question->ia_error_message ?? 'Fallo en la validación'); ?>
 
-                                    {{-- ========================================================== --}}
-                                    {{-- COLUMNA DE ACCIONES DE VALIDACIÓN (REFACTORIZADA) --}}
-                                    {{-- ========================================================== --}}
+                                            </div>
+                                        <?php else: ?>
+                                            
+                                            <span
+                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo e($statusClass); ?>">
+                                                <?php echo e(ucfirst(str_replace('_', ' ', $question->status))); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    
+
+                                    
+                                    
+                                    
                                     <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
                                         <div class="flex items-center space-x-2">
-                                            @if (in_array($question->status, ['borrador', 'necesita_correccion', 'fallo_comparativo']))
-                                                {{-- FORMULARIO 1: Validación Simple (Botón Azul) --}}
+                                            <?php if(in_array($question->status, ['borrador', 'necesita_correccion', 'fallo_comparativo'])): ?>
+                                                
 
-                                                @if (auth()->user()->role === 'en_revision_humana')
+                                                <?php if(auth()->user()->role === 'en_revision_humana'): ?>
                                                     <div class="flex items-center space-x-2 text-blue-600"
                                                         title="Pregunta en revisión por un validador experto.">
                                                         <svg class="w-5 h-5" fill="none" stroke="currentColor"
@@ -250,12 +243,12 @@
                                                         </svg>
                                                         <span class="text-xs font-semibold">En Revisión Humana</span>
                                                     </div>
-                                                @endif
+                                                <?php endif; ?>
 
                                                 <form
-                                                    action="{{ route('questions.submit_validation', ['question' => $question]) }}"
+                                                    action="<?php echo e(route('questions.submit_validation', ['question' => $question])); ?>"
                                                     method="POST" class="flex items-center space-x-2">
-                                                    @csrf
+                                                    <?php echo csrf_field(); ?>
                                                     <select name="ai_engine"
                                                         class="w-28 rounded-md border-gray-300 shadow-sm text-xs py-1"
                                                         title="Seleccionar motor de IA">
@@ -266,10 +259,11 @@
                                                         class="w-40 rounded-md border-gray-300 shadow-sm text-xs py-1"
                                                         title="Seleccionar un prompt personalizado">
                                                         <option value="">-- Prompt x Defecto --</option>
-                                                        @foreach ($prompts as $prompt)
-                                                            <option value="{{ $prompt->id }}">{{ $prompt->name }}
+                                                        <?php $__currentLoopData = $prompts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $prompt): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                            <option value="<?php echo e($prompt->id); ?>"><?php echo e($prompt->name); ?>
+
                                                             </option>
-                                                        @endforeach
+                                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                                     </select>
                                                     <button type="submit" title="Validar con motor seleccionado"
                                                         class="p-2 rounded-full text-blue-600 bg-blue-100 hover:bg-blue-200 transition">
@@ -283,10 +277,10 @@
 
                                                 <span class="text-gray-300">|</span>
 
-                                                {{-- FORMULARIO 2: Validación Comparativa (Botón Morado) --}}
-                                                <form action="{{ route('questions.compare.submit', $question) }}"
+                                                
+                                                <form action="<?php echo e(route('questions.compare.submit', $question)); ?>"
                                                     method="POST">
-                                                    @csrf
+                                                    <?php echo csrf_field(); ?>
                                                     <button type="submit"
                                                         title="Validación Comparativa (GPT vs Gemini)"
                                                         class="p-2 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200 transition">
@@ -299,7 +293,7 @@
                                                         </svg>
                                                     </button>
                                                 </form>
-                                            @elseif (in_array($question->status, ['en_validacion_ai', 'en_validacion_comparativa']))
+                                            <?php elseif(in_array($question->status, ['en_validacion_ai', 'en_validacion_comparativa'])): ?>
                                                 <span
                                                     class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                                     <svg class="animate-spin -ml-1 mr-1.5 h-4 w-4 text-yellow-500"
@@ -312,17 +306,17 @@
                                                     </svg>
                                                     Procesando...
                                                 </span>
-                                            @else
+                                            <?php else: ?>
                                                 <span class="text-xs text-gray-500 italic">No hay acciones
                                                     disponibles</span>
-                                            @endif
+                                            <?php endif; ?>
                                         </div>
                                     </td>
 
-                                    {{-- COLUMNA DE GESTIÓN (Ver, Editar, Eliminar) --}}
+                                    
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div class="flex items-center justify-center space-x-4">
-                                            <a href="{{ route('questions.show', $question) }}"
+                                            <a href="<?php echo e(route('questions.show', $question)); ?>"
                                                 class="text-gray-500 hover:text-gray-800" title="Ver Detalles">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor"
                                                     viewBox="0 0 24 24">
@@ -334,11 +328,11 @@
                                                     </path>
                                                 </svg>
                                             </a>
-                                            {{-- NUEVO: Botón ASIGNAR VALIDADOR (Solo Admin) --}}
-                                            @if (auth()->user()->role === 'administrador' && $question->status === 'revisado_por_ai')
-                                                <button wire:click="openAssignValidatorModal({{ $question->id }})"
+                                            
+                                            <?php if(auth()->user()->role === 'administrador' && $question->status === 'revisado_por_ai'): ?>
+                                                <button wire:click="openAssignValidatorModal(<?php echo e($question->id); ?>)"
                                                     class="text-teal-600 hover:text-teal-900"
-                                                    title="Asignar Validador">{{-- Ícono de Usuario con signo + --}}
+                                                    title="Asignar Validador">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor"
                                                         viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -347,10 +341,10 @@
                                                         </path>
                                                     </svg>
                                                 </button>
-                                            @endif
+                                            <?php endif; ?>
 
-                                            @can('update', $question)
-                                                <a href="{{ route('questions.edit', $question) }}"
+                                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('update', $question)): ?>
+                                                <a href="<?php echo e(route('questions.edit', $question)); ?>"
                                                     class="text-indigo-600 hover:text-indigo-900" title="Editar">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor"
                                                         viewBox="0 0 24 24">
@@ -360,10 +354,10 @@
                                                         </path>
                                                     </svg>
                                                 </a>
-                                            @endcan
+                                            <?php endif; ?>
 
-                                            @can('delete', $question)
-                                                <button onclick="deleteQuestion({{ $question->id }})"
+                                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('delete', $question)): ?>
+                                                <button onclick="deleteQuestion(<?php echo e($question->id); ?>)"
                                                     class="text-red-600 hover:text-red-900" title="Eliminar">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor"
                                                         viewBox="0 0 24 24">
@@ -373,37 +367,38 @@
                                                         </path>
                                                     </svg>
                                                 </button>
-                                            @endcan
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
-                            @empty
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                 <tr>
-                                    <td colspan="{{ auth()->user()->role === 'administrador' ? '7' : '6' }}"
+                                    <td colspan="<?php echo e(auth()->user()->role === 'administrador' ? '7' : '6'); ?>"
                                         class="px-6 py-12 text-center text-gray-500 italic">
                                         No se encontraron preguntas que coincidan con los filtros aplicados.
                                     </td>
                                 </tr>
-                            @endforelse
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
 
-                {{-- ========================================================== --}}
-                {{-- PAGINACIÓN --}}
-                {{-- (SE MANTIENE IGUAL) --}}
-                {{-- ========================================================== --}}
+                
+                
+                
+                
                 <div class="mt-6">
-                    {{ $questions->links() }}
+                    <?php echo e($questions->links()); ?>
+
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- ========================================================== --}}
-    {{-- JAVASCRIPT PARA ACCIONES DINÁMICAS (Refactorizado) --}}
-    {{-- ========================================================== --}}
-    @push('scripts')
+    
+    
+    
+    <?php $__env->startPush('scripts'); ?>
         <script>
             /**
              * Función auxiliar robusta para crear y enviar formularios dinámicos para acciones
@@ -448,7 +443,7 @@
             // Funciones wrapper para ser llamadas desde el HTML
             function deleteQuestion(questionId) {
                 // Asume que la ruta de borrado es 'questions.destroy'
-                const url = `{{ url('questions') }}/${questionId}`;
+                const url = `<?php echo e(url('questions')); ?>/${questionId}`;
                 createAndSubmitForm(url, 'DELETE',
                     '¿Estás seguro de que quieres eliminar esta pregunta? Esta acción es irreversible.');
             }
@@ -456,10 +451,20 @@
             // Ejemplo si tuvieras una ruta para duplicar
             /*
             function duplicateQuestion(questionId) {
-                const url = `{{ url('questions') }}/${questionId}/duplicate`;
+                const url = `<?php echo e(url('questions')); ?>/${questionId}/duplicate`;
                 createAndSubmitForm(url, 'POST', '¿Estás seguro de que quieres duplicar esta pregunta?');
             }
             */
         </script>
-    @endpush
-</x-app-layout>
+    <?php $__env->stopPush(); ?>
+ <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54)): ?>
+<?php $attributes = $__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54; ?>
+<?php unset($__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal9ac128a9029c0e4701924bd2d73d7f54)): ?>
+<?php $component = $__componentOriginal9ac128a9029c0e4701924bd2d73d7f54; ?>
+<?php unset($__componentOriginal9ac128a9029c0e4701924bd2d73d7f54); ?>
+<?php endif; ?>
+<?php /**PATH C:\Users\byron.moreano\Herd\svr-validator08102025\resources\views/admin/questions/index.blade.php ENDPATH**/ ?>

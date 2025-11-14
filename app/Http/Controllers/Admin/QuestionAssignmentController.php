@@ -17,8 +17,8 @@ class QuestionAssignmentController extends Controller
      */
     public function assign(Request $request, Question $question): RedirectResponse
     {
+        logger()->info("Iniciando asignación de validador para la pregunta ID: {$question->id}");
         // ==========================================================
-        // --- NUEVA REGLA DE NEGOCIO ---
         // Verificamos que la pregunta esté en un estado que permita la asignación.
         // Solo se pueden asignar preguntas que ya han sido revisadas por la IA.
         // ==========================================================

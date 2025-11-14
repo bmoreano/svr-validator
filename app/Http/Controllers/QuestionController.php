@@ -9,6 +9,7 @@ use App\Models\Career;
 use App\Models\User;
 use App\Services\QuestionCodeGeneratorService;
 use App\Services\QuestionVersioningService;
+use App\Services\AiModelHealthService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -209,7 +210,84 @@ class QuestionController extends Controller
     /**
      * Muestra los detalles de una pregunta específica.
      */
-    public function show(Question $question): View
+    public function show(Question $question, AiModelHealthService $healthService)
+    {
+        $this->authorize('view', $question);
+
+        // --- INICIO DE LA SOLUCIÓN: Lógica de Health Check ---
+
+        // Comentamos la lógica anterior que solo verificaba si la key existía
+        // // 1. Verificar qué motores de IA tienen una API key configurada.
+        // $availableEngines = [];
+        // if (!empty(config('openai.api_key'))) {
+        //     $availableEngines['chatgpt'] = 'ChatGPT (OpenAI)';
+        // }
+        // if (!empty(config('gemini.api_key'))) {
+        //     $availableEngines['gemini'] = 'Gemini (Google)';
+        // }
+        // $activeEnginesCount = count($availableEngines);
+
+        // 1. Verificar el estado funcional REAL de las API keys (usa caché)
+        $healthStatus = $healthService->checkModels(); // Retorna ['chatgpt' => bool, 'gemini' => bool]
+
+        // 2. Construir la lista de motores *disponibles y funcionales*
+        $availableEngines = [];
+        if ($healthStatus['chatgpt']) {
+            $availableEngines['chatgpt'] = 'ChatGPT (OpenAI)';
+        }
+        if ($healthStatus['gemini']) {
+            $availableEngines['gemini'] = 'Gemini (Google)';
+        }
+
+        // 3. Contar cuántos motores están activos
+        $activeEnginesCount = count($availableEngines);
+        // --- FIN DE LA SOLUCIÓN ---
+
+
+        // Cargar relaciones necesarias para la vista
+        $question->load([
+            'options',
+            'author',
+            'career',
+            'validations.validator',
+            'validations.responses.criterion'
+        ]);
+
+        // Lógica para obtener la última validación (IA o Humana)
+        $latestValidation = $question->validations()
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        $humanValidation = $question->validations()
+            ->whereHas('validator', fn($q) => $q->where('role', '!=', 'ia'))
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        // Pasamos las nuevas variables a la vista
+        return view('questions.show', compact(
+            'question',
+            'latestValidation',
+            'humanValidation',
+            'availableEngines',     // <-- Motores válidos
+            'activeEnginesCount',   // <-- Conteo de motores válidos
+            'healthStatus'          // <-- Array [chatgpt => bool, gemini => bool]
+        ));
+    }
+
+    /**
+     * Muestra la página de progreso de validación en vivo.
+     */
+    public function progress(Question $question)
+    {
+        // Autorizar que el usuario pueda ver esta pregunta
+        $this->authorize('view', $question);
+
+        // Simplemente carga la vista contenedora.
+        // El componente Livewire @livewire('validation-progress') se encargará del resto.
+        return view('questions.progress', ['question' => $question]);
+    }
+
+    public function show1(Question $question): View
     {
         $this->authorize('view', $question);
         $question->load('options', 'author', 'career', 'revisions');

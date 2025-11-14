@@ -82,7 +82,13 @@ class QuestionSubmissionController extends Controller
         }
 
         // 5. Redirigir con mensaje de éxito
-        return redirect()->route('questions.show', $question)
-            ->with('status', '¡Éxito! La pregunta ha sido enviada a validación de IA.');
+        
+        // Comentamos la redirección original
+        // return redirect()->route('questions.show', $question)
+        //     ->with('status', '¡Éxito! La pregunta ha sido enviada a validación de IA.');
+
+        // Redirigimos a la nueva página de progreso en vivo
+        return redirect()->route('questions.progress', $question)
+            ->with('status', 'La pregunta está siendo procesada. Esta página se actualizará automáticamente.');
     }
 }

@@ -29,6 +29,10 @@ class PlagiarismCheckService
         }
         if (empty($this->copyscapeApiKey) || empty($this->copyscapeUsername)) {
             Log::warning('COPYSCAPE_API_KEY o COPYSCAPE_USERNAME no están configuradas. El análisis profundo de plagio estará deshabilitado.');
+            $configWarnings[] = [
+                'title' => 'Credenciales de Copyscape no configuradas',
+                'message' => 'El análisis profundo de plagio contra fuentes externas de internet estará deshabilitado. Solo se realizarán comprobaciones de plagio internas.'
+            ];
         }
     }
 

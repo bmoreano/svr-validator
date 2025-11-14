@@ -23,14 +23,15 @@ class PromptBuilderService
      * @param Collection $criteriaBatch El lote de criterios a incluir en el prompt.
      * @return string
      */
-    public function buildForGemini(Question $pregunta, ?int $prompt_id, Collection $criteriaBatch): string
+    //public function buildForGemini(Question $pregunta, ?int $prompt_id, Collection $criteriaBatch): string
+    public function buildForGemini(Question $question, ?int $prompt_id = null): string
     {
         $promptContent = $this->getPromptContent($prompt_id, 'gemini');
         $formatoEstricto = "[{\"criterion_id\": 1, \"response\": \"si\", \"comment\": \"...\"}]";
         $promptContent = str_replace('{{FORMATO_ESTRICTO}}', $formatoEstricto, $promptContent);
 
         // La llamada a replaceVariables ahora incluye el tercer argumento.
-        return $this->replaceVariables($promptContent, $pregunta, $criteriaBatch);
+        return $this->replaceVariables($promptContent, $question, collect());
     }
 
     /**
@@ -41,7 +42,8 @@ class PromptBuilderService
      * @param Collection $criteriaBatch El lote de criterios a incluir en el prompt.
      * @return array
      */
-    public function buildForChatGpt(Question $pregunta, ?int $prompt_id, Collection $criteriaBatch): array
+    //public function buildForChatGpt(Question $pregunta, ?int $prompt_id, Collection $criteriaBatch): array
+    public function buildForChatGpt(Question $question, ?int $prompt_id = null): array
     {
         $promptContent = $this->getPromptContent($prompt_id, 'chatgpt');
         
@@ -49,7 +51,7 @@ class PromptBuilderService
         // La llamada a replaceVariables ahora incluye el tercer argumento '$criteriaBatch',
         // cumpliendo con la firma del método y solucionando el error.
         // ========================================================================
-        $finalPromptText = $this->replaceVariables($promptContent, $pregunta, $criteriaBatch);
+        $finalPromptText = $this->replaceVariables($promptContent, $question,  $criteriaBatch = collect());
         
         return [
             ['role' => 'system', 'content' => 'Eres un validador académico experto y riguroso. Tu única función es analizar una pregunta y devolver tus hallazgos en formato JSON.'],

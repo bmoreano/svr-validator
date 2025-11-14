@@ -17,6 +17,7 @@ class ValidationController extends Controller
         $pendingQuestions = Question::where('status','=','borrador');
         $pendingQuestions = $pendingQuestions->get();
         logger('pendingQuestions: '.$pendingQuestions->count());
+        logger('  <->  '.print_r($pendingQuestions,true)  );
         return view('validations.index',compact('pendingQuestions'));
     }
     public function review(Question $question): View
